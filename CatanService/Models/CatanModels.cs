@@ -1,6 +1,8 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Net.WebSockets;
 using System.Threading.Tasks;
 
 namespace CatanService.Models
@@ -27,35 +29,37 @@ namespace CatanService.Models
 
     }
 
-    public class UserId : IEqualityComparer<UserId>
+    public class PlayerId : IEqualityComparer<PlayerId>
     {
         public string GameName { get; set; }
-        public string UserName { get; set; }
+        public string PlayerName { get; set; }
         public override string ToString()
         {
-            return $"{GameName} - {UserName}";
+            return $"{GameName} - {PlayerName}";
         }
-        public bool Equals([AllowNull] UserId x, [AllowNull] UserId y)
+        public bool Equals([AllowNull] PlayerId x, [AllowNull] PlayerId y)
         {
             if (x is null || y is null) return false;
 
-            if ((x.GameName == y.GameName) && (x.UserName == y.UserName)) return true;
+            if ((x.GameName == y.GameName) && (x.PlayerName == y.PlayerName)) return true;
 
             return false;
         }
 
-        public int GetHashCode([DisallowNull] UserId obj)
+        public int GetHashCode([DisallowNull] PlayerId obj)
         {
-            return obj.GameName.GetHashCode() + obj.UserName.GetHashCode();
+            return obj.GameName.GetHashCode() + obj.PlayerName.GetHashCode();
         }
     }
 
-    public class UserResources
+    public class PlayerResources
     {
         public Dictionary<DevCardType, int> DevCards { get; } = new Dictionary<DevCardType, int>();
         public Dictionary<ResourceType, int> ResourceCards { get; } = new Dictionary<ResourceType, int>();
+        public string PlayerName { get; set; }
+        public string GameName { get; set; }
 
-        public UserResources()
+        public PlayerResources()
         {
             foreach (ResourceType key in Enum.GetValues(typeof(ResourceType)))
             {
@@ -66,7 +70,28 @@ namespace CatanService.Models
             {
                 DevCards[key] = 0;
             }
+
+            
         }
+        public ResourceCountClass ResourceCount
+        {
+            get
+            {
+                ResourceCountClass ret = new ResourceCountClass
+                {
+                    GoldMine = ResourceCards[ResourceType.GoldMine],
+                    Wood = ResourceCards[ResourceType.Wood],
+                    Brick = ResourceCards[ResourceType.Brick],
+                    Sheep = ResourceCards[ResourceType.Sheep],
+                    Wheat = ResourceCards[ResourceType.Wheat],
+                    Ore = ResourceCards[ResourceType.Ore]
+                };
+
+                return ret;
+            }
+        }
+
+        [JsonIgnore]
         public int TotalResources
         {
             get
@@ -80,5 +105,11 @@ namespace CatanService.Models
                 return count;
             }
         }
+
+        [JsonIgnore]
+        public WebSocket WebSocket { get; set; }
+        
+        [JsonIgnore]
+        public TaskCompletionSource<object> TCS { get; set; }
     }
 }
