@@ -2,11 +2,8 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using System;
 using System.Collections.Generic;
-using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
+
 
 namespace CatanService.Controllers
 {
@@ -28,10 +25,10 @@ namespace CatanService.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         public ActionResult<string> RegisterAsync(string gameName, string playerName)
         {
-            bool ret = Globals.SafeGetPlayerResources(gameName, playerName, out _);
+            bool ret = Globals.SafeGetPlayerResources(gameName, playerName, out PlayerResources resources);
             if (!ret)
             {
-                PlayerResources resources = new PlayerResources()
+                resources = new PlayerResources()
                 {
                     PlayerName = playerName,
                     GameName = gameName
@@ -40,7 +37,7 @@ namespace CatanService.Controllers
                 Globals.SafeSetPlayerResources(gameName, playerName, resources);
             }
 
-            return Ok($"{playerName} is playing in game {gameName}");
+            return Ok(Globals.AddPlayersAndSerialize(resources));
 
         }
 
@@ -59,6 +56,10 @@ namespace CatanService.Controllers
                 {
                     if (kvp.Key.GameName == gameName.ToLower())
                     {
+                        if (kvp.Value.ResourceUpdateTCS != null)
+                        {
+                            Globals.ReleaseHangingGet(kvp.Value.ResourceUpdateTCS);
+                        }
                         Globals.PlayersToResourcesDictionary.Remove(kvp.Key);
                     }
                 }
@@ -112,7 +113,7 @@ namespace CatanService.Controllers
                     
                 }
 
-                return Ok(JsonSerializer.Serialize<List<string>>(games));
+                return Ok(PlayerResources.Serialize<List<string>>(games));
             }
             finally
             {

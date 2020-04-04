@@ -88,6 +88,29 @@ namespace CatanService
             }
         }
 
+        public static string AddPlayersAndSerialize(PlayerResources resources)
+        {
+            rwLock.EnterReadLock();
+            try
+            {
+                resources.Players.Clear();
+                foreach (var kvp in Globals.PlayersToResourcesDictionary)
+                {
+                    if (resources.GameName.ToLower() == kvp.Key.GameName)
+                    {
+                        resources.Players.Add(kvp.Key.PlayerName);
+                    }
+                    
+                }
+
+                return PlayerResources.Serialize<PlayerResources>(resources);
+            }
+            finally
+            {
+                rwLock.ExitReadLock();
+            }
+        }
+
         public static void ReleaseHangingGet(TaskCompletionSource<object> tcs)
         {
             if (tcs != null)

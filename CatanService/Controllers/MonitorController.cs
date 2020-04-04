@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text.Json;
 using System.Threading.Tasks;
 using CatanSharedModels;
 using Microsoft.AspNetCore.Http;
@@ -49,7 +47,7 @@ namespace CatanService.Controllers
             //
             //  need to get the latest resources
             ret = Globals.SafeGetPlayerResources(gameName, playerName, out resources);
-            return Ok(JsonSerializer.Serialize<PlayerResources>(resources));
+            return Ok(Globals.AddPlayersAndSerialize(resources));
         }
         [HttpGet("resources/all")]
         [ProducesResponseType(StatusCodes.Status200OK)]
@@ -65,7 +63,7 @@ namespace CatanService.Controllers
             await Globals.ChangeLogTCS.Task;
             Globals.ChangeLogTCS = null;
             var resources = Globals.CopyAndClearChangeLog();
-            return Ok(JsonSerializer.Serialize<List<PlayerResources>>(resources));
+            return Ok(PlayerResources.Serialize<List<PlayerResources>>(resources));
 
         }
     }

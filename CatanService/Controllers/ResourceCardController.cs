@@ -3,10 +3,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using System;
-using System.Collections.Generic;
-using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -34,7 +30,7 @@ namespace CatanService.Controllers
                 return NotFound($"User {playerName} in game {gameName} not found");
             }
 
-            return Ok(JsonSerializer.Serialize<PlayerResources>(resources));
+            return Ok(PlayerResources.Serialize<PlayerResources>(resources));
         }
 
         [HttpPost("add/{gameName}/{playerName}")]
@@ -75,10 +71,10 @@ namespace CatanService.Controllers
             }
 
             AddResources(playerResources, toAdd);
-            Globals.AddChange(playerResources);
+            Globals.AddChange(toAdd);
             Globals.ReleaseHangingGet(playerResources.ResourceUpdateTCS);
             Globals.ReleaseGlobalMonitor();
-            return Ok(JsonSerializer.Serialize<PlayerResources>(playerResources));
+            return Ok(Globals.AddPlayersAndSerialize(playerResources));
 
         }
         [HttpPost("tradegold/{gameName}/{playerName}")]
@@ -99,15 +95,18 @@ namespace CatanService.Controllers
             }
 
             int askCount = trade.Brick + trade.Wood + trade.Wheat + trade.Ore + trade.Sheep;
-            if (askCount != -1 * trade.GoldMine)
+            if (askCount != trade.GoldMine)
             {
                 return BadRequest($"[Player={playerName}] [Game={gameName}]\n Asking for {askCount} resources, only have {trade.GoldMine} Gold");
             }
+
+            trade.GoldMine = -trade.GoldMine;
+
             Globals.AddChange(trade);
             AddResources(playerResources, trade);
             Globals.ReleaseHangingGet(playerResources.ResourceUpdateTCS);
             Globals.ReleaseGlobalMonitor();
-            return Ok(JsonSerializer.Serialize<PlayerResources>(playerResources));
+            return Ok(Globals.AddPlayersAndSerialize(playerResources));
 
         }
         [HttpPost("trade/{gameName}/{fromName}/{toName}")]
@@ -192,7 +191,7 @@ namespace CatanService.Controllers
             Globals.ReleaseHangingGet(fromResources.ResourceUpdateTCS);
             Globals.ReleaseHangingGet(toResources.ResourceUpdateTCS);
             Globals.ReleaseGlobalMonitor();
-            return Ok(JsonSerializer.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
+            return Ok(PlayerResources.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
         }
 
         [HttpPost("take/{gameName}/{fromName}/{toName}")]
@@ -214,7 +213,7 @@ namespace CatanService.Controllers
 
             if (fromResources.TotalResources == 0)
             {
-                return Ok(JsonSerializer.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
+                return Ok(PlayerResources.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
             }
 
             Random rand = new Random((int)DateTime.Now.Ticks);
@@ -224,7 +223,7 @@ namespace CatanService.Controllers
             {
                 fromResources.Wheat--; // take a wheat
                 toResources.Wheat++;  //add it
-                return Ok(JsonSerializer.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
+                return Ok(PlayerResources.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
             }
             else
             {
@@ -235,7 +234,7 @@ namespace CatanService.Controllers
             {
                 fromResources.Wood--; // take a Wood
                 toResources.Wood++;  //add it
-                return Ok(JsonSerializer.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
+                return Ok(PlayerResources.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
             }
             else
             {
@@ -246,7 +245,7 @@ namespace CatanService.Controllers
             {
                 fromResources.Brick--; // take a Brick
                 toResources.Brick++;  //add it
-                return Ok(JsonSerializer.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
+                return Ok(PlayerResources.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
             }
             else
             {
@@ -257,7 +256,7 @@ namespace CatanService.Controllers
             {
                 fromResources.Sheep--; // take a Sheep
                 toResources.Sheep++;  //add it
-                return Ok(JsonSerializer.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
+                return Ok(PlayerResources.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
             }
             else
             {
@@ -270,7 +269,7 @@ namespace CatanService.Controllers
             Globals.ReleaseHangingGet(fromResources.ResourceUpdateTCS);
             Globals.ReleaseHangingGet(toResources.ResourceUpdateTCS);
             Globals.ReleaseGlobalMonitor();
-            return Ok(JsonSerializer.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
+            return Ok(PlayerResources.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
 
 
         }
@@ -278,7 +277,7 @@ namespace CatanService.Controllers
         [HttpPost("meritimetrade/{gameName}/{playerName}/{resourceToGive}/{count}/{resourceToGet}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public ActionResult<string> TakeAsync(string gameName, string playerName, ResourceType resourceToGive, int count, ResourceType resourceToGet)
+        public ActionResult<string> MeritimeTrade(string gameName, string playerName, ResourceType resourceToGive, int count, ResourceType resourceToGet)
         {
             _ = Globals.SafeGetPlayerResources(gameName, playerName, out PlayerResources playerResources);
             if (playerResources == null)
@@ -300,7 +299,7 @@ namespace CatanService.Controllers
             Globals.ReleaseHangingGet(playerResources.ResourceUpdateTCS);
             Globals.ReleaseGlobalMonitor();
 
-            return Ok(JsonSerializer.Serialize<PlayerResources>(playerResources));
+            return Ok(Globals.AddPlayersAndSerialize(playerResources));
         }
         private void AddResources(PlayerResources playerResources, PlayerResources resourceCount)
         {
