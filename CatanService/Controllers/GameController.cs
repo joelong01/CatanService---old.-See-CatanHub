@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
-
+using System.Text.Json;
 
 namespace CatanService.Controllers
 {
@@ -11,7 +11,7 @@ namespace CatanService.Controllers
     [Route("api/catan/game")]
     public class GameController : ControllerBase
     {
-
+        
         private readonly ILogger<GameController> _logger;
 
         public GameController(ILogger<GameController> logger)
@@ -19,25 +19,28 @@ namespace CatanService.Controllers
             _logger = logger;
         }
 
-       
+
 
         [HttpPost("register/{gameName}/{playerName}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         public ActionResult<string> RegisterAsync(string gameName, string playerName)
         {
-            bool ret = Globals.SafeGetPlayerResources(gameName, playerName, out PlayerResources resources);
+            bool ret = TSGlobal.GlobalState.TSGetPlayerResources(gameName, playerName, out ClientState resources);
             if (!ret)
             {
-                resources = new PlayerResources()
+                resources = new ClientState()
                 {
                     PlayerName = playerName,
                     GameName = gameName
                 };
 
-                Globals.SafeSetPlayerResources(gameName, playerName, resources);
-            }
+                TSGlobal.GlobalState.TSSetPlayerResources(gameName, playerName, resources);
+                TSGlobal.GlobalState.TSAddLogEntry(new GameLog() { Players = TSGlobal.GlobalState.TSGetPlayers(gameName), PlayerName = playerName, Action = ServiceAction.PlayerAdded });
 
-            return Ok(Globals.AddPlayersAndSerialize(resources));
+            }
+            
+            TSGlobal.GlobalState.TSReleaseMonitors(gameName); // this will cause the client monitoring changes to get a list of players from the GameUpdateLog
+            return Ok(resources.TSSerialize());
 
         }
 
@@ -45,81 +48,45 @@ namespace CatanService.Controllers
 
 
         [HttpDelete("delete/{gameName}")]
+        [Produces("application/json")]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status200OK)]
         public ActionResult<string> DeleteAsync(string gameName)
         {
-            Globals.rwLock.EnterWriteLock();
-            try
+            var ret = TSGlobal.GlobalState.TSDeleteGame(gameName);
+            if (!ret)
             {
-                foreach (var kvp in Globals.PlayersToResourcesDictionary)
-                {
-                    if (kvp.Key.GameName == gameName.ToLower())
-                    {
-                        if (kvp.Value.ResourceUpdateTCS != null)
-                        {
-                            Globals.ReleaseHangingGet(kvp.Value.ResourceUpdateTCS);
-                        }
-                        Globals.PlayersToResourcesDictionary.Remove(kvp.Key);
-                    }
-                }
+                return NotFound($"{gameName} not found");
 
-                return Ok(gameName);
+
             }
-            finally
-            {
-                Globals.rwLock.ExitWriteLock();
-            }
+            TSGlobal.GlobalState.TSAddLogEntry(new GameLog() { Players = TSGlobal.GlobalState.TSGetPlayers(gameName), Action = ServiceAction.GameDeleted });
+            TSGlobal.GlobalState.TSReleaseMonitors(gameName); // this will cause the client monitoring changes to get a list of players from the GameUpdateLog
+            return Ok($"{gameName} deleted");
+
 
         }
 
         [HttpGet("users/{gameName}")]
+        [Produces("application/json")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public ActionResult<IEnumerable<string>> GetUsersAsync(string gameName)
+        public ActionResult<string> GetUsersAsync(string gameName)
         {
-            Globals.rwLock.EnterReadLock();
-            try
-            {
-                List<string> users = new List<string>();
-                foreach (var kvp in Globals.PlayersToResourcesDictionary)
-                {
-                    if (kvp.Key.GameName == gameName.ToLower())
-                    {
-                        users.Add(kvp.Key.PlayerName);
-                    }
-                }
-                return Ok(users);
-            }
-            finally
-            {
-                Globals.rwLock.ExitReadLock();
-            }
+            var players = TSGlobal.GlobalState.TSGetPlayers(gameName);
+            if (players.Count == 0) return Ok($"No Players in game {gameName}");
+
+            return Ok(TSGlobal.Serialize<List<string>>(players));
         }
 
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
         public ActionResult<string> GetGamesAsync()
         {
-            Globals.rwLock.EnterReadLock();
-            try
-            {
-                List<string> games = new List<string>();
-                foreach (var kvp in Globals.PlayersToResourcesDictionary)
-                {
-                    if (!games.Contains(kvp.Key.GameName))
-                    {
-                        games.Add(kvp.Key.GameName);
-                    }
-                    
-                }
+            var games = TSGlobal.GlobalState.TSGetGames();
+            if (games.Count == 0) return Ok($"No games currently being played");
 
-                return Ok(PlayerResources.Serialize<List<string>>(games));
-            }
-            finally
-            {
-                Globals.rwLock.ExitReadLock();
-            }
-            
+            return Ok(TSGlobal.Serialize<List<string>>(games));
+
         }
 
         [HttpGet("help")]
@@ -129,6 +96,6 @@ namespace CatanService.Controllers
             return Ok("You have landed on the Catan Service Help page!");
         }
 
-            
+
     }
 }

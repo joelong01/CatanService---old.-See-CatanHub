@@ -5,12 +5,14 @@ using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using System.Text.Json.Serialization;
 using System.Text.Json;
+using System.Threading;
 
 namespace CatanSharedModels
 {
     public enum TileOrientation { FaceDown, FaceUp, None };
     public enum HarborType { Sheep, Wood, Ore, Wheat, Brick, ThreeForOne, Uninitialized, None };
-
+    
+    public enum Entitlement { Undefined, DevCard, Settlement, City }
 
     public enum ResourceType { Sheep, Wood, Ore, Wheat, Brick, Desert, Back, None, Sea, GoldMine, VictoryPoint, Knight, YearOfPlenty, RoadBuilding, Monopoly };
     public enum DevCardType { Knight, VictoryPoint, YearOfPlenty, RoadBuilding, Monopoly, Unknown };
@@ -55,6 +57,20 @@ namespace CatanSharedModels
         private int _sheep = 0;
         private int _brick = 0;
         private int _goldMine = 0;
+
+        public TradeResources() { }
+
+        public TradeResources(TradeResources tradeResources)
+        {
+            Wheat = this.Wheat;
+            Wood = this.Wood;
+            Brick = this.Brick;
+            Ore = this.Ore;
+            Sheep = this.Sheep;
+            GoldMine = this.GoldMine;
+
+        }
+
         public int Wheat
         {
             get
@@ -150,6 +166,17 @@ namespace CatanSharedModels
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
         }
+        public TradeResources GetNegated()
+        {
+            return new TradeResources()
+            {
+                Wheat = -Wheat,
+                Wood = -Wood,
+                Ore = -Ore,
+                Sheep = -Sheep,
+                Brick = -Brick,
+            };
+        }
     }
 
     public class PlayerResources : INotifyPropertyChanged
@@ -165,12 +192,42 @@ namespace CatanSharedModels
         private List<DevelopmentCard> _devCards = new List<DevelopmentCard>();
         private TradeResources _tradeResources = new TradeResources();
         public event PropertyChangedEventHandler PropertyChanged;
+        private List<Entitlement> _entitlements = new List<Entitlement>();
+        public List<Entitlement> Entitlements
+        {
+            get
+            {
+                return _entitlements;
+            }
+            set
+            {
+                if (value != _entitlements)
+                {
+                    _entitlements = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
         [JsonIgnore]
         public int TotalResources => Wheat + Wood + Brick + Ore + Sheep + GoldMine;
 
-        [JsonIgnore]
-        public TaskCompletionSource<object> ResourceUpdateTCS { get; set; } = null;
-        [JsonPropertyName("PlayerName")]
+        public PlayerResources(){}
+        public List<DevelopmentCard> DevCards
+        {
+            get
+            {
+                return _devCards;
+            }
+            set
+            {
+                if (value != _devCards)
+                {
+                    _devCards = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+
         public string PlayerName
         {
             get
@@ -192,7 +249,6 @@ namespace CatanSharedModels
          * 
          */
         private List<string> _players = new List<string>();
-        [JsonPropertyName("Players")]
         public List<string> Players
         {
             get
@@ -207,7 +263,6 @@ namespace CatanSharedModels
                 }
             }
         }
-        [JsonPropertyName("TradeResources")]
         public TradeResources TradeResources
         {
             get => _tradeResources;
@@ -229,9 +284,7 @@ namespace CatanSharedModels
             }
             return count;
         }
-        [JsonPropertyName("VictoryPoints")]
         public int VictoryPoints => GetDevCardCount(DevCardType.VictoryPoint, false);
-        [JsonPropertyName("KnightsPlayed")]
         public int KnightsPlayed => GetDevCardCount(DevCardType.Knight, true);
         public int MonopolyPlayed => GetDevCardCount(DevCardType.Monopoly, true);
         public int RoadBuildingPlayed => GetDevCardCount(DevCardType.RoadBuilding, true);
@@ -347,21 +400,7 @@ namespace CatanSharedModels
                 }
             }
         }
-        public List<DevelopmentCard> DevCards
-        {
-            get
-            {
-                return _devCards;
-            }
-            set
-            {
-                if (value != _devCards)
-                {
-                    _devCards = value;
-                    NotifyPropertyChanged();
-                }
-            }
-        }
+       
 
 
         private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
@@ -377,12 +416,6 @@ namespace CatanSharedModels
             Ore = -Ore;
             Sheep = -Sheep;
             Brick = -Brick;
-        }
-
-        public PlayerResources()
-        {
-
-
         }
 
         public void AddResources(PlayerResources toAdd)
@@ -418,38 +451,11 @@ namespace CatanSharedModels
         }
 
 
-        public int AddResource(ResourceType resourceType, int count)
-        {
-            switch (resourceType)
-            {
-                case ResourceType.Sheep:
-                    this.Sheep += count;
-                    return this.Sheep;
-                case ResourceType.Wood:
-                    this.Wood += count;
-                    return this.Wood;
-                case ResourceType.Ore:
-                    this.Ore += count;
-                    return this.Ore;
-                case ResourceType.Wheat:
-                    this.Wheat += count;
-                    return this.Wheat;
-                case ResourceType.Brick:
-                    this.Brick += count;
-                    return this.Brick;
-                case ResourceType.GoldMine:
-                    this.GoldMine += count;
-                    return this.GoldMine;
-                default:
-                    throw new Exception($"Unexpected resource type passed into AddResource {resourceType}");
-            }
-        }
-
         static public string Serialize<T>(T obj)
         {
             var options = new JsonSerializerOptions
             {
-                PropertyNameCaseInsensitive = true,                
+                PropertyNameCaseInsensitive = true,
             };
             return JsonSerializer.Serialize<T>(obj, options);
         }
