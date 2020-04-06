@@ -19,7 +19,7 @@ namespace CatanService.Controllers
         {
             //
             //  need this to get the TaskCompletionSource
-            bool ret = TSGlobal.GlobalState.TSGetPlayerResources(gameName, playerName, out ClientState resources);
+            bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState resources);
             if (!ret)
             {
                 return NotFound($"{playerName} in game { gameName} not found");

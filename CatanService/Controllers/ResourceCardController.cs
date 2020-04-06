@@ -26,7 +26,7 @@ namespace CatanService.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public ActionResult<string> GetCards(string gameName, string playerName)
         {
-            bool ret = TSGlobal.GlobalState.TSGetPlayerResources(gameName, playerName, out ClientState resources);
+            bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState resources);
             if (!ret)
             {
                 return NotFound($"{playerName} in game { gameName} not found");
@@ -43,7 +43,7 @@ namespace CatanService.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public ActionResult<string> GrantResources([FromBody] TradeResources toAdd, string gameName, string playerName)
         {
-            bool ret = TSGlobal.GlobalState.TSGetPlayerResources(gameName, playerName, out ClientState resources);
+            bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState resources);
             if (!ret)
             {
                 return NotFound($"{playerName} in game { gameName} not found");
@@ -62,8 +62,8 @@ namespace CatanService.Controllers
             resources.TSAdd(toAdd);
 
 
-            TSGlobal.GlobalState.TSAddLogEntry(new ResourceLog() { PlayerResources = resources, Action = ServiceAction.GrantResources, PlayerName = playerName });
-            TSGlobal.GlobalState.TSReleaseMonitors(gameName);
+            TSGlobal.PlayerState.TSAddLogEntry(new ResourceLog() { PlayerResources = resources, Action = ServiceAction.GrantResources, PlayerName = playerName });
+            TSGlobal.PlayerState.TSReleaseMonitors(gameName);
             return Ok(resources.TSSerialize());
 
 
@@ -84,7 +84,7 @@ namespace CatanService.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public ActionResult<string> TradeGold([FromBody] TradeResources trade, string gameName, string playerName)
         {
-            bool ret = TSGlobal.GlobalState.TSGetPlayerResources(gameName, playerName, out ClientState resources);
+            bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState resources);
             if (!ret)
             {
                 return NotFound($"{playerName} in game { gameName} not found");
@@ -107,8 +107,8 @@ namespace CatanService.Controllers
             // now lock it so that you change it in a thread safe way
             trade.GoldMine = -trade.GoldMine;
             resources.TSAdd(trade);
-            TSGlobal.GlobalState.TSAddLogEntry(new ResourceLog() { PlayerResources = resources, Action = ServiceAction.TradeGold, PlayerName = playerName });
-            TSGlobal.GlobalState.TSReleaseMonitors(gameName);
+            TSGlobal.PlayerState.TSAddLogEntry(new ResourceLog() { PlayerResources = resources, Action = ServiceAction.TradeGold, PlayerName = playerName });
+            TSGlobal.PlayerState.TSReleaseMonitors(gameName);
             return Ok(resources.TSSerialize());
         }
         /// <summary>
@@ -125,13 +125,13 @@ namespace CatanService.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public ActionResult<string> Trade([FromBody] TradeResources[] trade, string gameName, string fromName, string toName)
         {
-            bool ret = TSGlobal.GlobalState.TSGetPlayerResources(gameName, fromName, out ClientState fromResources);
+            bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, fromName, out ClientState fromResources);
             if (!ret)
             {
                 return NotFound($"{fromName} in game { gameName} not found");
 
             }
-            ret = TSGlobal.GlobalState.TSGetPlayerResources(gameName, toName, out ClientState toResources);
+            ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, toName, out ClientState toResources);
             if (toResources == null)
             {
                 return NotFound($"{toName} in game { gameName} not found");
@@ -192,8 +192,8 @@ namespace CatanService.Controllers
             fromResources.TSAdd(toTrade);
             toResources.TSAdd(toTrade.GetNegated());
 
-            TSGlobal.GlobalState.TSAddLogEntry(new TradeLog() { PlayerName = fromName, FromName = fromName, ToName = toName, FromTrade = fromTrade, ToTrade = toTrade, FromResources = fromResources, ToResources = toResources });
-            TSGlobal.GlobalState.TSReleaseMonitors(gameName);
+            TSGlobal.PlayerState.TSAddLogEntry(new TradeLog() { PlayerName = fromName, FromName = fromName, ToName = toName, FromTrade = fromTrade, ToTrade = toTrade, FromResources = fromResources, ToResources = toResources });
+            TSGlobal.PlayerState.TSReleaseMonitors(gameName);
             return Ok(TSGlobal.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
         }
 
@@ -209,7 +209,7 @@ namespace CatanService.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public ActionResult<string> Take(string gameName, string fromName, string toName)
         {
-            bool ret = TSGlobal.GlobalState.TSGetPlayerResources(gameName, fromName, out ClientState fromResources);
+            bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, fromName, out ClientState fromResources);
             ResourceType takenResource = ResourceType.None; ;
             if (!ret)
             {
@@ -217,7 +217,7 @@ namespace CatanService.Controllers
 
             }
 
-            ret = TSGlobal.GlobalState.TSGetPlayerResources(gameName, toName, out ClientState toResources);
+            ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, toName, out ClientState toResources);
             if (!ret)
             {
                 return NotFound($"{fromName} in game { gameName} not found");
@@ -304,8 +304,8 @@ namespace CatanService.Controllers
             finally
             {
                 // log it
-                TSGlobal.GlobalState.TSAddLogEntry(new TakeLog() { PlayerName = fromName, FromName = fromName, ToName = toName, Taken = takenResource, FromResources = fromResources, ToResources = toResources, Action = ServiceAction.TakeCard });
-                TSGlobal.GlobalState.TSReleaseMonitors(gameName);
+                TSGlobal.PlayerState.TSAddLogEntry(new TakeLog() { PlayerName = fromName, FromName = fromName, ToName = toName, Taken = takenResource, FromResources = fromResources, ToResources = toResources, Action = ServiceAction.TakeCard });
+                TSGlobal.PlayerState.TSReleaseMonitors(gameName);
             }
 
         }
@@ -315,7 +315,7 @@ namespace CatanService.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public ActionResult<string> MeritimeTrade(string gameName, string playerName, ResourceType resourceType, int cost)
         {
-            bool ret = TSGlobal.GlobalState.TSGetPlayerResources(gameName, playerName, out ClientState playerResources);
+            bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState playerResources);
 
             if (!ret)
             {
@@ -332,8 +332,8 @@ namespace CatanService.Controllers
 
             playerResources.TSAddResource(resourceType, -cost);
             playerResources.TSAddResource(resourceType, 1);
-            TSGlobal.GlobalState.TSAddLogEntry(new MeritimeTradeLog() { Cost = cost, PlayerName = playerName, Traded = resourceType });
-            TSGlobal.GlobalState.TSReleaseMonitors(gameName);
+            TSGlobal.PlayerState.TSAddLogEntry(new MeritimeTradeLog() { Cost = cost, PlayerName = playerName, Traded = resourceType });
+            TSGlobal.PlayerState.TSReleaseMonitors(gameName);
 
             return Ok(playerResources.TSSerialize());
         }

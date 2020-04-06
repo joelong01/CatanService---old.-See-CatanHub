@@ -9,7 +9,8 @@ namespace CatanSharedModels
     public enum ServiceLogType
     {
         Undefined, Resource, Game, Purchase,
-        Trade, TakeCard, MeritimeTrade
+        Trade, TakeCard, MeritimeTrade,
+        UpdateTurn
     }
     /// <summary>
     ///     this enum tells us what the data was used for. We often have data shapes for only one reason...
@@ -17,7 +18,7 @@ namespace CatanSharedModels
     public enum ServiceAction
     {
         Undefined, Purchased, PlayerAdded, UserRemoved, GameCreated, GameDeleted,
-        TradeGold, GrantResources, TradeResources, TakeCard, Refund, MeritimeTrade
+        TradeGold, GrantResources, TradeResources, TakeCard, Refund, MeritimeTrade, UpdatedTurn
     }
 
     public class ServiceLogEntry
@@ -32,6 +33,12 @@ namespace CatanSharedModels
     {
         public PlayerResources PlayerResources { get; set; }
         public ResourceLog() { LogType = ServiceLogType.Resource; }
+    }
+
+    public class TurnLog : ServiceLogEntry
+    {
+        public string NewPlayer { get; set; } = "";
+        public TurnLog() { LogType = ServiceLogType.UpdateTurn; Action = ServiceAction.UpdatedTurn; }
     }
 
     public class TradeLog : ServiceLogEntry

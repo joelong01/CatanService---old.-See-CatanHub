@@ -19,7 +19,7 @@ namespace CatanService.Controllers
         public ActionResult<JsonResult> Purchase(string gameName, string playerName, Entitlement entitlement)
         {
 
-            bool ret = TSGlobal.GlobalState.TSGetPlayerResources(gameName, playerName, out ClientState resources);
+            bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState resources);
             if (!ret)
             {
                 return NotFound($"{playerName} in game { gameName} not found");
@@ -34,8 +34,8 @@ namespace CatanService.Controllers
                 return BadRequest($"{playerName} does not have the resources necessary to purchase {entitlement}");
             }
             resources.TSAdd(cost.GetNegated());
-            TSGlobal.GlobalState.TSAddLogEntry(new PurchaseLog() { Entitlement = entitlement, Action = ServiceAction.Purchased, PlayerResources = resources, PlayerName = playerName });
-            TSGlobal.GlobalState.TSReleaseMonitors(gameName);
+            TSGlobal.PlayerState.TSAddLogEntry(new PurchaseLog() { Entitlement = entitlement, Action = ServiceAction.Purchased, PlayerResources = resources, PlayerName = playerName });
+            TSGlobal.PlayerState.TSReleaseMonitors(gameName);
             return Ok(resources.TSSerialize());
         }
         /// <summary>
@@ -53,7 +53,7 @@ namespace CatanService.Controllers
         public ActionResult<JsonResult> Refund(string gameName, string playerName, Entitlement entitlement)
         {
 
-            bool ret = TSGlobal.GlobalState.TSGetPlayerResources(gameName, playerName, out ClientState resources);
+            bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState resources);
             if (!ret)
             {
                 return NotFound($"{playerName} in game { gameName} not found");
@@ -72,8 +72,8 @@ namespace CatanService.Controllers
 
 
             resources.TSAdd(cost.GetNegated());
-            TSGlobal.GlobalState.TSAddLogEntry(new PurchaseLog() { Entitlement = entitlement, Action = ServiceAction.Refund, PlayerResources = resources, PlayerName = playerName });
-            TSGlobal.GlobalState.TSReleaseMonitors(gameName);
+            TSGlobal.PlayerState.TSAddLogEntry(new PurchaseLog() { Entitlement = entitlement, Action = ServiceAction.Refund, PlayerResources = resources, PlayerName = playerName });
+            TSGlobal.PlayerState.TSReleaseMonitors(gameName);
             return Ok(resources.TSSerialize());
         }
 

@@ -12,6 +12,12 @@ namespace CatanService
 {
 
     
+    /// <summary>
+    ///     this contains all the state assosiated with a particular player. Note that you have 1 player per client
+    ///     so you should have one of these per client.  in theory only one thead at a time should be accessing this
+    ///     class, but that just makes the locks cheeper.  i've made them all thread safe in case downstream requirements
+    ///     make me need thread safety.
+    /// </summary>
     public class ClientState : PlayerResources
     {
         //
@@ -21,8 +27,6 @@ namespace CatanService
         public TaskCompletionSource<object> LogTaskCompletionSource { get; set; } = null;
         private List<ServiceLogEntry> _log = new List<ServiceLogEntry>();
         private TaskCompletionSource<object> _tcs;
-
-
         public async Task<List<ServiceLogEntry>> TSWaitForLog()
         {
             if (_tcs != null)
@@ -41,7 +45,6 @@ namespace CatanService
             return TSGetLogEntries();
 
         }
-
         public void TSReleaseLogToClient()
         {
             if (_tcs != null) // if this is null, nobody is waiting
@@ -49,8 +52,6 @@ namespace CatanService
                 _tcs.SetResult(null);
             }
         }
-
-
         public void TSAdd(ClientState toAdd)
         {
             ResourceLock.EnterWriteLock();
@@ -87,7 +88,6 @@ namespace CatanService
                 ResourceLock.ExitWriteLock();
             }
         }
-
         public void TSAdd(PlayerResources toAdd)
         {
             ResourceLock.EnterWriteLock();
@@ -105,7 +105,6 @@ namespace CatanService
                 ResourceLock.ExitWriteLock();
             }
         }
-
         public int TSAddResource(ResourceType resourceType, int count)
         {
             ResourceLock.EnterWriteLock();
@@ -140,7 +139,6 @@ namespace CatanService
                 ResourceLock.ExitWriteLock();
             }
         }
-
         public int TSResourceCount(ResourceType resourceType)
         {
             ResourceLock.EnterReadLock();
@@ -169,8 +167,6 @@ namespace CatanService
                 ResourceLock.ExitReadLock();
             }
         }
-
-
         public string TSSerialize()
         {
             ResourceLock.EnterReadLock();
@@ -191,7 +187,6 @@ namespace CatanService
             };
             return JsonSerializer.Deserialize<T>(json, options);
         }
-
         /// <summary>
         ///     add a log entry in a thread safe way
         /// </summary>
@@ -230,7 +225,6 @@ namespace CatanService
                 ResourceLock.ExitWriteLock();
             }
         }
-
         /// <summary>
         ///     return a copy of the log - note that there is a 1:1 correspondence to kvp<game,player> and PlayerResources
         ///     and we keep a copy of the log in every ClientState object.  Each client will have one Monitor, which monitors *all*
@@ -272,7 +266,6 @@ namespace CatanService
                     GameName = this.GameName,
                     Entitlements = new List<Entitlement>(this.Entitlements),
                     DevCards = new List<DevelopmentCard>(this.DevCards),
-                    TradeResources = new TradeResources(this.TradeResources),
                 };
 
                 return pr;
@@ -282,8 +275,6 @@ namespace CatanService
                 ResourceLock.ExitReadLock();
             }
         }
-
-
         public void TSAddEntitlement(Entitlement entitlement)
         {
             ResourceLock.EnterWriteLock();
@@ -296,7 +287,6 @@ namespace CatanService
                 ResourceLock.ExitWriteLock();
             }
         }
-
         public bool TSRemoveEntitlement(Entitlement entitlement)
         {
             ResourceLock.EnterWriteLock();
@@ -310,7 +300,10 @@ namespace CatanService
             }
         }
     }
-    public class SharedClientState
+    /// <summary>
+    ///     this contains all the state about players that is global to the game.  all APIs need to be thread safe.
+    /// </summary>
+    public class GlobalPlayerState
     {
         private ReaderWriterLockSlim DictionaryLock { get; } = new ReaderWriterLockSlim();
         private Dictionary<PlayerId, ClientState> PlayersToResourcesDictionary { get; } = new Dictionary<PlayerId, ClientState>(new PlayerId()); // given a game, give me a list of users
@@ -499,9 +492,27 @@ namespace CatanService
 
     }
 
+    /// <summary>
+    ///     State for a specific game
+    /// 
+    /// </summary>
+
+    public class GameState
+    {
+      
+    }
+
+    /// <summary>
+    ///     This class holds state specific to a particular game 
+    /// </summary>
+    ///     
+    public class GlobalGameState
+    {
+
+    }
     public static class TSGlobal
     {
-        public static SharedClientState GlobalState { get; } = new SharedClientState();
+        public static GlobalPlayerState PlayerState { get; } = new GlobalPlayerState();
         public static string Serialize<T>(T obj)
         {
             var options = new JsonSerializerOptions

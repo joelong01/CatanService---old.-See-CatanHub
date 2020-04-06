@@ -190,7 +190,6 @@ namespace CatanSharedModels
         private int _brick = 0;
         private int _goldMine = 0;
         private List<DevelopmentCard> _devCards = new List<DevelopmentCard>();
-        private TradeResources _tradeResources = new TradeResources();
         public event PropertyChangedEventHandler PropertyChanged;
         private List<Entitlement> _entitlements = new List<Entitlement>();
         public List<Entitlement> Entitlements
@@ -263,15 +262,7 @@ namespace CatanSharedModels
                 }
             }
         }
-        public TradeResources TradeResources
-        {
-            get => _tradeResources;
-            set
-            {
-                _tradeResources = value;
-                NotifyPropertyChanged();
-            }
-        }
+        
         private int GetDevCardCount(DevCardType cardType, bool played)
         {
             int count = 0;
