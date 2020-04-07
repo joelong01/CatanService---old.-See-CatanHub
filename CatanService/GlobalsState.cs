@@ -11,6 +11,13 @@ using System.Threading.Tasks;
 namespace CatanService
 {
 
+    public class ListHelper
+    {
+        public object LogEntry { get; set; }
+        [JsonIgnore]
+        public Type Type { get; set; }
+    }
+
 
     /// <summary>
     ///     this contains all the state assosiated with a particular player. Note that you have 1 player per client
@@ -25,13 +32,14 @@ namespace CatanService
         public ReaderWriterLockSlim ResourceLock { get; } = new ReaderWriterLockSlim(); // protects access to this ResourceTracking
         public TaskCompletionSource<object> ResourceUpdateTaskCompletionSource { get; set; } = null;
         public TaskCompletionSource<object> LogTaskCompletionSource { get; set; } = null;
-        private List<ServiceLogEntry> _log = new List<ServiceLogEntry>();
+        private List<ListHelper> _log = new List<ListHelper>();
         private TaskCompletionSource<object> _tcs;
-        public async Task<List<ServiceLogEntry>> TSWaitForLog()
+        public async Task<List<ListHelper>> TSWaitForLog()
         {
             if (_tcs != null)
             {
-                throw new Exception("the TCS shoudl be null in ClientState!");
+                //throw new Exception("the TCS shoudl be null in ClientState!");
+                return new List<ListHelper>();
             }
             var logCopy = TSGetLogEntries();
             if (logCopy.Count != 0)
@@ -215,37 +223,12 @@ namespace CatanService
         ///     add a log entry in a thread safe way
         /// </summary>
         /// <param name="logEntry"></param>
-        public void TSAddLogEntry(ServiceLogEntry logEntry)
+        public void TSAddLogEntry(ListHelper helper)
         {
             ResourceLock.EnterWriteLock();
             try
-            {
-
-                switch (logEntry.LogType)
-                {
-                    case ServiceLogType.Resource:
-                        logEntry.Data = TSGlobal.Serialize<ResourceLog>(logEntry as ResourceLog);
-                        break;
-                    case ServiceLogType.Game:
-                         logEntry.Data = TSGlobal.Serialize<GameLog>(logEntry as GameLog);                        
-                        break;
-                    case ServiceLogType.Purchase:
-                        logEntry.Data = TSGlobal.Serialize<PurchaseLog>(logEntry as PurchaseLog);
-                        break;
-                    case ServiceLogType.Trade:
-                        logEntry.Data = TSGlobal.Serialize<TradeLog>(logEntry as TradeLog);
-                        break;
-                    case ServiceLogType.MeritimeTrade:
-                        logEntry.Data = TSGlobal.Serialize<MeritimeTradeLog>(logEntry as MeritimeTradeLog);
-                        break;
-                    case ServiceLogType.Monopoly:
-                        logEntry.Data = TSGlobal.Serialize<MonopolyLog>(logEntry as MonopolyLog);
-                        break;
-                    default:
-                        break;
-                }
-
-                _log.Add(logEntry);
+            { 
+                _log.Add(helper);
             }
             finally
             {
@@ -258,12 +241,12 @@ namespace CatanService
         ///     the client changes (because each client runs the UI). easy to cheat by looking at the messages.  will assume good actors
         ///     in the system.
         /// </summary>
-        private List<ServiceLogEntry> TSGetLogEntries()
+        private List<ListHelper> TSGetLogEntries()
         {
             ResourceLock.EnterWriteLock();
             try
             {
-                var ret = new List<ServiceLogEntry>(_log);
+                var ret = new List<ListHelper>(_log);
                 _log.Clear();
                 return ret;
             }
@@ -460,31 +443,39 @@ namespace CatanService
             DictionaryLock.EnterReadLock();
             try
             {
+                
+                ListHelper jsonResult;
+
                 switch (logEntry.LogType)
                 {
                     case ServiceLogType.Resource:
-                        logEntry.Data = TSGlobal.Serialize<ResourceLog>(logEntry as ResourceLog);
+                        jsonResult = new ListHelper() { LogEntry = logEntry, Type  = typeof(ResourceLog) };
                         break;
                     case ServiceLogType.Game:
-                        logEntry.Data = TSGlobal.Serialize<GameLog>(logEntry as GameLog);
+                        jsonResult = new ListHelper() { LogEntry = logEntry, Type = typeof(GameLog) };
                         break;
                     case ServiceLogType.Purchase:
-                        logEntry.Data = TSGlobal.Serialize<PurchaseLog>(logEntry as PurchaseLog);
+                        jsonResult = new ListHelper() { LogEntry = logEntry, Type = typeof(PurchaseLog) };
                         break;
                     case ServiceLogType.Trade:
-                        logEntry.Data = TSGlobal.Serialize<TradeLog>(logEntry as TradeLog);
+                        jsonResult = new ListHelper() { LogEntry = logEntry, Type = typeof(TradeLog) };
                         break;
-                    case ServiceLogType.TakeCard:
-                        logEntry.Data = TSGlobal.Serialize<TakeLog>(logEntry as TakeLog);
+                    case ServiceLogType.MeritimeTrade:
+                        jsonResult = new ListHelper() { LogEntry = logEntry, Type = typeof(MeritimeTradeLog) };
+                        break;
+                    case ServiceLogType.Monopoly:
+                        jsonResult = new ListHelper() { LogEntry = logEntry, Type = typeof(MonopolyLog) };
                         break;
                     default:
-                        break;
+                        throw new Exception("You forgot to add a LogType case statement!");
                 }
+
 
                 foreach (var kvp in PlayersToResourcesDictionary)
                 {
                     ClientState tracker = kvp.Value;
-                    tracker.TSAddLogEntry(logEntry);
+                    tracker.TSAddLogEntry(jsonResult);
+                    
                 }
             }
             finally
@@ -624,8 +615,6 @@ namespace CatanService
             options.Converters.Add(new JsonStringEnumConverter());
             return JsonSerializer.Serialize<T>(obj, options);
         }
-
-
 
     }
 

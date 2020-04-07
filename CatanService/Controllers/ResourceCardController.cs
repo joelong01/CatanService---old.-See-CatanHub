@@ -325,9 +325,9 @@ namespace CatanService.Controllers
 
             // make sure they have enough to trade
 
-            if (playerResources.ResourceCount(resourceType) < cost)
+            if (playerResources.TSResourceCount(resourceType) < cost)
             {
-                return BadRequest($"[Player={playerName}] [Game={gameName}]\n needs {cost} of {resourceType} only has {playerResources.ResourceCount(resourceType)} ");
+                return BadRequest($"[Player={playerName}] [Game={gameName}]\n needs {cost} of {resourceType} only has {playerResources.TSResourceCount(resourceType)} ");
             }
 
             playerResources.TSAddResource(resourceType, -cost);
