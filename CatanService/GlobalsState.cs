@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 namespace CatanService
 {
 
-    
+
     /// <summary>
     ///     this contains all the state assosiated with a particular player. Note that you have 1 player per client
     ///     so you should have one of these per client.  in theory only one thead at a time should be accessing this
@@ -167,6 +167,30 @@ namespace CatanService
                 ResourceLock.ExitReadLock();
             }
         }
+        public bool TSPlayDevCard(DevCardType devCardType)
+        {
+
+
+            ResourceLock.EnterWriteLock();
+            try
+            {
+                foreach (var card in DevCards)
+                {
+                    if (card.DevCard == devCardType && card.Played == false)
+                    {
+                        card.Played = true;
+                        return true;
+                    }
+                }
+                return false;
+            }
+            finally
+            {
+                ResourceLock.ExitWriteLock();
+            }
+
+
+        }
         public string TSSerialize()
         {
             ResourceLock.EnterReadLock();
@@ -203,7 +227,7 @@ namespace CatanService
                         logEntry.Data = TSGlobal.Serialize<ResourceLog>(logEntry as ResourceLog);
                         break;
                     case ServiceLogType.Game:
-                        logEntry.Data = TSGlobal.Serialize<GameLog>(logEntry as GameLog);
+                         logEntry.Data = TSGlobal.Serialize<GameLog>(logEntry as GameLog);                        
                         break;
                     case ServiceLogType.Purchase:
                         logEntry.Data = TSGlobal.Serialize<PurchaseLog>(logEntry as PurchaseLog);
@@ -213,6 +237,9 @@ namespace CatanService
                         break;
                     case ServiceLogType.MeritimeTrade:
                         logEntry.Data = TSGlobal.Serialize<MeritimeTradeLog>(logEntry as MeritimeTradeLog);
+                        break;
+                    case ServiceLogType.Monopoly:
+                        logEntry.Data = TSGlobal.Serialize<MonopolyLog>(logEntry as MonopolyLog);
                         break;
                     default:
                         break;
@@ -287,12 +314,86 @@ namespace CatanService
                 ResourceLock.ExitWriteLock();
             }
         }
+        public int TSTakeAll(ResourceType resType)
+        {
+            int total = 0;
+            ResourceLock.EnterWriteLock();
+            try
+            {
+                switch (resType)
+                {
+                    case ResourceType.Sheep:
+                        total += this.Sheep;
+                        this.Sheep = 0;
+                        break;
+                    case ResourceType.Wood:
+                        total += this.Wood;
+                        this.Wood = 0;
+                        break;
+                    case ResourceType.Ore:
+                        total += this.Ore;
+                        this.Ore = 0;
+                        break;
+                    case ResourceType.Wheat:
+                        total += this.Wheat;
+                        this.Wheat = 0;
+                        break;
+                    case ResourceType.Brick:
+                        total += this.Brick;
+                        this.Brick = 0;
+                        break;
+                    default:
+                        return 0;
+                }
+                if (total > 0)
+                {
+                    TSGlobal.PlayerState.TSAddLogEntry(new MonopolyLog() { PlayerResources = this, Action = ServiceAction.LostToMonopoly, PlayerName = this.PlayerName, Count = total, ResourceType = resType });
+                }
+                return total;
+            }
+            finally
+            {
+                ResourceLock.ExitWriteLock();
+            }
+        }
         public bool TSRemoveEntitlement(Entitlement entitlement)
         {
             ResourceLock.EnterWriteLock();
             try
             {
-               return this.Entitlements.Remove(entitlement);
+                return this.Entitlements.Remove(entitlement);
+            }
+            finally
+            {
+                ResourceLock.ExitWriteLock();
+            }
+        }
+
+        public void TSAdd(int count, ResourceType resourceType)
+        {
+            ResourceLock.EnterWriteLock();
+            try
+            {
+                switch (resourceType)
+                {
+                    case ResourceType.Sheep:
+                        this.Sheep += count;
+                        break;
+                    case ResourceType.Wood:
+                        this.Wood += count;
+                        break;
+                    case ResourceType.Ore:
+                        this.Ore += count;
+                        break;
+                    case ResourceType.Wheat:
+                        this.Wheat += count;
+                        break;
+                    case ResourceType.Brick:
+                        this.Brick += count;
+                        break;
+                    default:
+                        throw new Exception($"Unexpected resource type: {resourceType}");
+                }
             }
             finally
             {
@@ -499,7 +600,7 @@ namespace CatanService
 
     public class GameState
     {
-      
+
     }
 
     /// <summary>
@@ -518,7 +619,7 @@ namespace CatanService
             var options = new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true,
-                WriteIndented = true
+                WriteIndented = false
             };
             options.Converters.Add(new JsonStringEnumConverter());
             return JsonSerializer.Serialize<T>(obj, options);
@@ -528,6 +629,6 @@ namespace CatanService
 
     }
 
-  
+
 }
 

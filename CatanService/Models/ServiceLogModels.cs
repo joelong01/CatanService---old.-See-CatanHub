@@ -10,7 +10,8 @@ namespace CatanSharedModels
     {
         Undefined, Resource, Game, Purchase,
         Trade, TakeCard, MeritimeTrade,
-        UpdateTurn
+        UpdateTurn,
+        Monopoly
     }
     /// <summary>
     ///     this enum tells us what the data was used for. We often have data shapes for only one reason...
@@ -18,7 +19,12 @@ namespace CatanSharedModels
     public enum ServiceAction
     {
         Undefined, Purchased, PlayerAdded, UserRemoved, GameCreated, GameDeleted,
-        TradeGold, GrantResources, TradeResources, TakeCard, Refund, MeritimeTrade, UpdatedTurn
+        TradeGold, GrantResources, TradeResources, TakeCard, Refund, MeritimeTrade, UpdatedTurn,
+        LostToMonopoly,
+        PlayedMonopoly,
+        PlayedRoadBuilding,
+        PlayedKnight,
+        PlayedYearOfPlenty
     }
 
     public class ServiceLogEntry
@@ -26,14 +32,22 @@ namespace CatanSharedModels
         public ServiceLogType LogType { get; set; } = ServiceLogType.Undefined;
         public ServiceAction Action { get; set; } = ServiceAction.Undefined;
         public string PlayerName { get; set; }
-        public string Data { get; set; } = "";
+        public object Data { get; set; } = "";
     }
-
     public class ResourceLog : ServiceLogEntry
     {
-        public PlayerResources PlayerResources { get; set; }
+        public PlayerResources PlayerResources { get; set; } // this is not needed for Undo, but is needed for each of the games to update their UI
+        public TradeResources TradeResource { get; set; } // needed for Undo
+
         public ResourceLog() { LogType = ServiceLogType.Resource; }
     }
+
+    public class MonopolyLog : ResourceLog
+    {
+        public ResourceType ResourceType { get; set; }
+        public int Count { get; set; } = 0;
+       public MonopolyLog() { }
+    }   
 
     public class TurnLog : ServiceLogEntry
     {

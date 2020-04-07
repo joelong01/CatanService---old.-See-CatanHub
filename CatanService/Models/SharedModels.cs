@@ -12,7 +12,9 @@ namespace CatanSharedModels
     public enum TileOrientation { FaceDown, FaceUp, None };
     public enum HarborType { Sheep, Wood, Ore, Wheat, Brick, ThreeForOne, Uninitialized, None };
     
-    public enum Entitlement { Undefined, DevCard, Settlement, City }
+    public enum Entitlement { Undefined, DevCard, Settlement, City,
+        Road
+    }
 
     public enum ResourceType { Sheep, Wood, Ore, Wheat, Brick, Desert, Back, None, Sea, GoldMine, VictoryPoint, Knight, YearOfPlenty, RoadBuilding, Monopoly };
     public enum DevCardType { Knight, VictoryPoint, YearOfPlenty, RoadBuilding, Monopoly, Unknown };
@@ -442,21 +444,5 @@ namespace CatanSharedModels
         }
 
 
-        static public string Serialize<T>(T obj)
-        {
-            var options = new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true,
-            };
-            return JsonSerializer.Serialize<T>(obj, options);
-        }
-        static public T Deserialize<T>(string json)
-        {
-            var options = new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true,
-            };
-            return JsonSerializer.Deserialize<T>(json, options);
-        }
     }
 }

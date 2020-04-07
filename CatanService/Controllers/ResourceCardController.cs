@@ -11,7 +11,7 @@ using System.Text.Json;
 
 namespace CatanService.Controllers
 {
-    [Route("api/catan/resourcecards")]
+    [Route("api/catan/resource")]
     public class ResourceCardController : Controller
     {
 
@@ -62,7 +62,7 @@ namespace CatanService.Controllers
             resources.TSAdd(toAdd);
 
 
-            TSGlobal.PlayerState.TSAddLogEntry(new ResourceLog() { PlayerResources = resources, Action = ServiceAction.GrantResources, PlayerName = playerName });
+            TSGlobal.PlayerState.TSAddLogEntry(new ResourceLog() { PlayerResources = resources, Action = ServiceAction.GrantResources, PlayerName = playerName, TradeResource=toAdd });
             TSGlobal.PlayerState.TSReleaseMonitors(gameName);
             return Ok(resources.TSSerialize());
 
@@ -107,7 +107,7 @@ namespace CatanService.Controllers
             // now lock it so that you change it in a thread safe way
             trade.GoldMine = -trade.GoldMine;
             resources.TSAdd(trade);
-            TSGlobal.PlayerState.TSAddLogEntry(new ResourceLog() { PlayerResources = resources, Action = ServiceAction.TradeGold, PlayerName = playerName });
+            TSGlobal.PlayerState.TSAddLogEntry(new ResourceLog() { PlayerResources = resources, Action = ServiceAction.TradeGold, PlayerName = playerName, TradeResource=trade });
             TSGlobal.PlayerState.TSReleaseMonitors(gameName);
             return Ok(resources.TSSerialize());
         }
@@ -243,7 +243,7 @@ namespace CatanService.Controllers
                     tradeResource.Wheat = 1;
                     toResources.TSAdd(tradeResource);
                     takenResource = ResourceType.Wheat;
-                    return Ok(PlayerResources.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
+                    return Ok(TSGlobal.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
                 }
                 else
                 {
@@ -257,7 +257,7 @@ namespace CatanService.Controllers
                     tradeResource.Wood = 1;
                     toResources.TSAdd(tradeResource);
                     takenResource = ResourceType.Wood;
-                    return Ok(PlayerResources.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
+                    return Ok(TSGlobal.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
                 }
                 else
                 {
@@ -271,7 +271,7 @@ namespace CatanService.Controllers
                     tradeResource.Brick = 1;
                     toResources.TSAdd(tradeResource);
                     takenResource = ResourceType.Brick;
-                    return Ok(PlayerResources.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
+                    return Ok(TSGlobal.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
                 }
                 else
                 {
@@ -285,7 +285,7 @@ namespace CatanService.Controllers
                     tradeResource.Sheep = 1;
                     toResources.TSAdd(tradeResource);
                     takenResource = ResourceType.Sheep;
-                    return Ok(PlayerResources.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
+                    return Ok(TSGlobal.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
                 }
                 else
                 {
@@ -338,5 +338,128 @@ namespace CatanService.Controllers
             return Ok(playerResources.TSSerialize());
         }
 
+
+        [HttpPost("devcard/play/yearofplenty/{gameName}/{playerName}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public ActionResult<string> PlayYearOfPlenty([FromBody] TradeResources tr, string gameName, string playerName)
+        {
+            bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState playerResources);
+
+            if (!ret)
+            {
+                return NotFound($"{playerName} in game {gameName} not found");
+
+            }
+
+            if (tr == null)
+            {
+                return BadRequest($"Year Of Plenty requires a TradeResource in the Body of the request");
+            }
+            int total = tr.Brick + tr.Wheat + tr.Wood + tr.Ore + tr.Sheep;
+            if (total != 2)
+            {
+                return BadRequest($"Year Of Plenty requires a TradeResource to have a total of two resources specified instead of {total}");
+            }
+
+            ret = playerResources.TSPlayDevCard(DevCardType.YearOfPlenty);
+            if (!ret)
+            {
+                return NotFound($"{playerName} in game {gameName} does not have a Year Of Plenty to play.");
+
+            }
+
+            playerResources.TSAdd(tr);
+            TSGlobal.PlayerState.TSAddLogEntry(new ResourceLog() { PlayerResources = playerResources, Action = ServiceAction.PlayedYearOfPlenty, PlayerName = playerName, TradeResource = tr });
+            return Ok(playerResources.TSSerialize());
+
+        }
+
+        [HttpPost("devcard/play/monopoly/{gameName}/{playerName}/{resourceType}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public ActionResult<string> PlayMonopoly(string gameName, string playerName, ResourceType resourceType)
+        {
+            bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState playerResources);
+
+            if (!ret)
+            {
+                return NotFound($"{playerName} in game {gameName} not found");
+
+            }
+            bool set = playerResources.TSPlayDevCard(DevCardType.Monopoly);
+            if (!set)
+            {
+                return NotFound($"{playerName} in game {gameName} does not have a Monopoly to play.");
+            }
+
+
+            int count = 0;
+            foreach (var name in TSGlobal.PlayerState.TSGetPlayers(gameName))
+            {
+                if (name == playerName) continue;
+                TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState victim); 
+                count += victim.TSTakeAll(resourceType);// this logs the loss of cards
+            }
+
+            playerResources.TSAdd(count, resourceType);
+            TSGlobal.PlayerState.TSAddLogEntry(new MonopolyLog() { PlayerResources = playerResources, Action = ServiceAction.PlayedMonopoly, PlayerName = playerName, ResourceType=resourceType, Count=count }); //logs the gain of cards
+            TSGlobal.PlayerState.TSReleaseMonitors(gameName);
+
+            return Ok(playerResources.TSSerialize());
+        }
+        [HttpPost("devcard/play/roadbuilding/{gameName}/{playerName}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public ActionResult<string> PlayRoadBuilding(string gameName, string playerName)
+        {
+            bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState playerResources);
+
+            if (!ret)
+            {
+                return NotFound($"{playerName} in game {gameName} not found");
+
+            }
+            bool set = playerResources.TSPlayDevCard(DevCardType.RoadBuilding);
+            if (!set)
+            {
+                return NotFound($"{playerName} in game {gameName} does not have a Road Building card to play.");
+            }
+
+            
+
+            playerResources.TSAddEntitlement(Entitlement.Road);
+            playerResources.TSAddEntitlement(Entitlement.Road);
+
+
+            TSGlobal.PlayerState.TSAddLogEntry(new ServiceLogEntry() { Action = ServiceAction.PlayedRoadBuilding, PlayerName = playerName}); 
+            TSGlobal.PlayerState.TSReleaseMonitors(gameName);
+
+            return Ok(playerResources.TSSerialize());
+        }
+        [HttpPost("devcard/play/knight/{gameName}/{playerName}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public ActionResult<string> PlayKnight(string gameName, string playerName)
+        {
+            bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState playerResources);
+
+            if (!ret)
+            {
+                return NotFound($"{playerName} in game {gameName} not found");
+
+            }
+            bool set = playerResources.TSPlayDevCard(DevCardType.Knight);
+            if (!set)
+            {
+                return NotFound($"{playerName} in game {gameName} does not have a Knight card to play.");
+            }
+
+
+            TSGlobal.PlayerState.TSAddLogEntry(new ServiceLogEntry() { Action = ServiceAction.PlayedKnight, PlayerName = playerName });
+            TSGlobal.PlayerState.TSReleaseMonitors(gameName);
+
+            return Ok(playerResources.TSSerialize());
+        }
     }
 }
