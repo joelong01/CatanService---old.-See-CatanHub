@@ -62,7 +62,7 @@ namespace CatanService.Controllers
             resources.TSAdd(toAdd);
 
 
-            TSGlobal.PlayerState.TSAddLogEntry(new ResourceLog() { PlayerResources = resources, Action = ServiceAction.GrantResources, PlayerName = playerName, TradeResource=toAdd });
+            TSGlobal.PlayerState.TSAddLogEntry(gameName,new ResourceLog() { PlayerResources = resources, Action = ServiceAction.GrantResources, PlayerName = playerName, TradeResource=toAdd, RequestUrl = this.Request.Path });
             TSGlobal.PlayerState.TSReleaseMonitors(gameName);
             return Ok(resources);
 
@@ -107,7 +107,7 @@ namespace CatanService.Controllers
             // now lock it so that you change it in a thread safe way
             trade.GoldMine = -trade.GoldMine;
             resources.TSAdd(trade);
-            TSGlobal.PlayerState.TSAddLogEntry(new ResourceLog() { PlayerResources = resources, Action = ServiceAction.TradeGold, PlayerName = playerName, TradeResource=trade });
+            TSGlobal.PlayerState.TSAddLogEntry(gameName,new ResourceLog() { PlayerResources = resources, Action = ServiceAction.TradeGold, PlayerName = playerName, TradeResource=trade, RequestUrl = this.Request.Path });
             TSGlobal.PlayerState.TSReleaseMonitors(gameName);
             return Ok(resources);
         }
@@ -132,7 +132,7 @@ namespace CatanService.Controllers
 
             }
             ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, toName, out ClientState toResources);
-            if (toResources == null)
+            if (!ret)
             {
                 return NotFound($"{toName} in game { gameName} not found");
             }
@@ -192,7 +192,7 @@ namespace CatanService.Controllers
             fromResources.TSAdd(toTrade);
             toResources.TSAdd(toTrade.GetNegated());
 
-            TSGlobal.PlayerState.TSAddLogEntry(new TradeLog() { PlayerName = fromName, FromName = fromName, ToName = toName, FromTrade = fromTrade, ToTrade = toTrade, FromResources = fromResources, ToResources = toResources });
+            TSGlobal.PlayerState.TSAddLogEntry(gameName,new TradeLog() { PlayerName = fromName, FromName = fromName, ToName = toName, FromTrade = fromTrade, ToTrade = toTrade, FromResources = fromResources, ToResources = toResources, RequestUrl = this.Request.Path });
             TSGlobal.PlayerState.TSReleaseMonitors(gameName);
             return Ok(new PlayerResources[2] { fromResources, toResources });
         }
@@ -210,7 +210,7 @@ namespace CatanService.Controllers
         public IActionResult Take(string gameName, string fromName, string toName)
         {
             bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, fromName, out ClientState fromResources);
-            ResourceType takenResource = ResourceType.None; ;
+            ResourceType takenResource = ResourceType.None;
             if (!ret)
             {
                 return NotFound($"{fromName} in game { gameName} not found");
@@ -227,7 +227,7 @@ namespace CatanService.Controllers
             //  if the from player has no resources, then we are good
             if (fromResources.TotalResources == 0)
             {
-                return Ok(TSGlobal.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
+                return Ok(new PlayerResources[2] { fromResources, toResources });
             }
             try
             {
@@ -243,7 +243,7 @@ namespace CatanService.Controllers
                     tradeResource.Wheat = 1;
                     toResources.TSAdd(tradeResource);
                     takenResource = ResourceType.Wheat;
-                    return Ok(TSGlobal.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
+                    return Ok((new PlayerResources[2] { fromResources, toResources }));
                 }
                 else
                 {
@@ -257,7 +257,7 @@ namespace CatanService.Controllers
                     tradeResource.Wood = 1;
                     toResources.TSAdd(tradeResource);
                     takenResource = ResourceType.Wood;
-                    return Ok(TSGlobal.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
+                    return Ok(new PlayerResources[2] { fromResources, toResources });
                 }
                 else
                 {
@@ -271,7 +271,7 @@ namespace CatanService.Controllers
                     tradeResource.Brick = 1;
                     toResources.TSAdd(tradeResource);
                     takenResource = ResourceType.Brick;
-                    return Ok(TSGlobal.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
+                    return Ok((new PlayerResources[2] { fromResources, toResources }));
                 }
                 else
                 {
@@ -285,7 +285,7 @@ namespace CatanService.Controllers
                     tradeResource.Sheep = 1;
                     toResources.TSAdd(tradeResource);
                     takenResource = ResourceType.Sheep;
-                    return Ok(TSGlobal.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
+                    return Ok((new PlayerResources[2] { fromResources, toResources }));
                 }
                 else
                 {
@@ -304,7 +304,7 @@ namespace CatanService.Controllers
             finally
             {
                 // log it
-                TSGlobal.PlayerState.TSAddLogEntry(new TakeLog() { PlayerName = fromName, FromName = fromName, ToName = toName, Taken = takenResource, FromResources = fromResources, ToResources = toResources, Action = ServiceAction.TakeCard });
+                TSGlobal.PlayerState.TSAddLogEntry(gameName,new TakeLog() { PlayerName = fromName, FromName = fromName, ToName = toName, Taken = takenResource, FromResources = fromResources, ToResources = toResources, Action = ServiceAction.TakeCard, RequestUrl = this.Request.Path });
                 TSGlobal.PlayerState.TSReleaseMonitors(gameName);
             }
 
@@ -332,7 +332,7 @@ namespace CatanService.Controllers
 
             playerResources.TSAddResource(resourceType, -cost);
             playerResources.TSAddResource(resourceType, 1);
-            TSGlobal.PlayerState.TSAddLogEntry(new MeritimeTradeLog() { Cost = cost, PlayerName = playerName, Traded = resourceType });
+            TSGlobal.PlayerState.TSAddLogEntry(gameName,new MeritimeTradeLog() { Cost = cost, PlayerName = playerName, Traded = resourceType, RequestUrl = this.Request.Path });
             TSGlobal.PlayerState.TSReleaseMonitors(gameName);
 
             return Ok(playerResources);
@@ -370,7 +370,7 @@ namespace CatanService.Controllers
             }
 
             playerResources.TSAdd(tr);
-            TSGlobal.PlayerState.TSAddLogEntry(new ResourceLog() { PlayerResources = playerResources, Action = ServiceAction.PlayedYearOfPlenty, PlayerName = playerName, TradeResource = tr });
+            TSGlobal.PlayerState.TSAddLogEntry(gameName,new ResourceLog() { PlayerResources = playerResources, Action = ServiceAction.PlayedYearOfPlenty, PlayerName = playerName, TradeResource = tr, RequestUrl = this.Request.Path });
             return Ok(playerResources);
 
         }
@@ -393,17 +393,18 @@ namespace CatanService.Controllers
                 return NotFound($"{playerName} in game {gameName} does not have a Monopoly to play.");
             }
 
-
+            gameName = gameName.ToLower();
+            playerName = playerName.ToLower();
             int count = 0;
             foreach (var name in TSGlobal.PlayerState.TSGetPlayers(gameName))
             {
                 if (name == playerName) continue;
-                TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState victim); 
-                count += victim.TSTakeAll(resourceType);// this logs the loss of cards
+                TSGlobal.PlayerState.TSGetPlayerResources(gameName, name, out ClientState victim); 
+                count += victim.TSTakeAll(gameName, this.Request.Path, resourceType);// this logs the loss of cards
             }
 
             playerResources.TSAdd(count, resourceType);
-            TSGlobal.PlayerState.TSAddLogEntry(new MonopolyLog() { PlayerResources = playerResources, Action = ServiceAction.PlayedMonopoly, PlayerName = playerName, ResourceType=resourceType, Count=count }); //logs the gain of cards
+            TSGlobal.PlayerState.TSAddLogEntry(gameName,new MonopolyLog() { PlayerResources = playerResources, Action = ServiceAction.PlayedMonopoly, PlayerName = playerName, ResourceType=resourceType, Count=count, RequestUrl = this.Request.Path }); //logs the gain of cards
             TSGlobal.PlayerState.TSReleaseMonitors(gameName);
 
             return Ok(playerResources);
@@ -432,10 +433,10 @@ namespace CatanService.Controllers
             playerResources.TSAddEntitlement(Entitlement.Road);
 
 
-            TSGlobal.PlayerState.TSAddLogEntry(new ServiceLogEntry() { Action = ServiceAction.PlayedRoadBuilding, PlayerName = playerName}); 
+            TSGlobal.PlayerState.TSAddLogEntry(gameName,new ServiceLogEntry() { Action = ServiceAction.PlayedRoadBuilding, PlayerName = playerName, RequestUrl = this.Request.Path}); 
             TSGlobal.PlayerState.TSReleaseMonitors(gameName);
 
-            return Ok(playerResources.TSSerialize());
+            return Ok(playerResources);
         }
         [HttpPost("devcard/play/knight/{gameName}/{playerName}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
@@ -456,7 +457,7 @@ namespace CatanService.Controllers
             }
 
 
-            TSGlobal.PlayerState.TSAddLogEntry(new ServiceLogEntry() { Action = ServiceAction.PlayedKnight, PlayerName = playerName });
+            TSGlobal.PlayerState.TSAddLogEntry(gameName,new ServiceLogEntry() { Action = ServiceAction.PlayedKnight, PlayerName = playerName, RequestUrl = this.Request.Path });
             TSGlobal.PlayerState.TSReleaseMonitors(gameName);
 
             return Ok(playerResources);

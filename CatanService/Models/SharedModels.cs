@@ -18,30 +18,6 @@ namespace CatanSharedModels
     public enum DevCardType { Knight, VictoryPoint, YearOfPlenty, RoadBuilding, Monopoly, Unknown };
 
 
-    public class PlayerId : IEqualityComparer<PlayerId>
-    {
-        public string GameName { get; set; }
-        public string PlayerName { get; set; }
-
-        public override string ToString()
-        {
-            return $"{GameName} - {PlayerName}";
-        }
-        public bool Equals(PlayerId x, PlayerId y)
-        {
-            if (x is null || y is null) return false;
-
-            if ((x.GameName == y.GameName) && (x.PlayerName == y.PlayerName)) return true;
-
-            return false;
-        }
-
-        public int GetHashCode(PlayerId obj)
-        {
-            return obj.GameName.GetHashCode() + obj.PlayerName.GetHashCode();
-        }
-    }
-
     public class DevelopmentCard
     {
         public DevCardType DevCard { get; set; } = DevCardType.Unknown;

@@ -17,7 +17,7 @@ namespace CatanService.Controllers
         [HttpGet("{gameName}/{playerName}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        //[Produces("application/json")]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> MonitorResources(string gameName, string playerName)
         {
             //
@@ -29,7 +29,10 @@ namespace CatanService.Controllers
 
             }
             List<object> list = await resources.TSWaitForLog();
-
+            if (list.Count == 0)
+            {
+                return BadRequest($"A client is already registered for this player {playerName}");
+            }
             return Ok(list);
 
         }

@@ -52,7 +52,7 @@ namespace CatanService.Controllers
             }
 
             resources.TSAdd(cost.GetNegated());
-            TSGlobal.PlayerState.TSAddLogEntry(new PurchaseLog() { Entitlement = entitlement, Action = ServiceAction.Purchased, PlayerResources = resources, PlayerName = playerName });
+            TSGlobal.PlayerState.TSAddLogEntry(gameName,new PurchaseLog() { Entitlement = entitlement, Action = ServiceAction.Purchased, PlayerResources = resources, PlayerName = playerName, RequestUrl = this.Request.Path });
             TSGlobal.PlayerState.TSReleaseMonitors(gameName);
             return Ok(resources);
         }
@@ -90,7 +90,7 @@ namespace CatanService.Controllers
 
 
             resources.TSAdd(cost.GetNegated());
-            TSGlobal.PlayerState.TSAddLogEntry(new PurchaseLog() { Entitlement = entitlement, Action = ServiceAction.Refund, PlayerResources = resources, PlayerName = playerName });
+            TSGlobal.PlayerState.TSAddLogEntry(gameName,new PurchaseLog() { Entitlement = entitlement, Action = ServiceAction.Refund, PlayerResources = resources, PlayerName = playerName, RequestUrl = this.Request.Path });
             TSGlobal.PlayerState.TSReleaseMonitors(gameName);
             return Ok(resources);
         }

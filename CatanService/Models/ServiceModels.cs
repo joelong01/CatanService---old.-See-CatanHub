@@ -32,6 +32,7 @@ namespace CatanSharedModels
         public ServiceLogType LogType { get; set; } = ServiceLogType.Undefined;
         public ServiceAction Action { get; set; } = ServiceAction.Undefined;
         public string PlayerName { get; set; }
+        public string RequestUrl { get; set; }
        
     }
     public class ResourceLog : ServiceLogEntry

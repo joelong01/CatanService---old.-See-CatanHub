@@ -24,8 +24,7 @@ namespace CatanService
         //  a lock to protect the resources
 
         private ReaderWriterLockSlim ResourceLock { get; } = new ReaderWriterLockSlim(); // protects access to this ResourceTracking
-        private TaskCompletionSource<object> ResourceUpdateTaskCompletionSource { get; set; } = null;
-        private TaskCompletionSource<object> LogTaskCompletionSource { get; set; } = null;
+       
         private List<object> _log = new List<object>();
         private TaskCompletionSource<object> _tcs;
         public async Task<List<object>> TSWaitForLog()
@@ -53,7 +52,7 @@ namespace CatanService
             ResourceLock.EnterWriteLock();
             try
             {
-                DevCards.Add(new DevelopmentCard() { DevCard = card, Played = false }); 
+                DevCards.Add(new DevelopmentCard() { DevCard = card, Played = false });
             }
             finally
             {
@@ -233,14 +232,19 @@ namespace CatanService
         /// <param name="logEntry"></param>
         public void TSAddLogEntry(object helper)
         {
-            ResourceLock.EnterWriteLock();
+            bool tookLock = false;
+            if (!ResourceLock.IsWriteLockHeld)
+            { 
+                ResourceLock.EnterWriteLock();
+                tookLock = true;
+            }
             try
             {
                 _log.Add(helper);
             }
             finally
             {
-                ResourceLock.ExitWriteLock();
+                if (tookLock) ResourceLock.ExitWriteLock();
             }
         }
         /// <summary>
@@ -305,8 +309,9 @@ namespace CatanService
                 ResourceLock.ExitWriteLock();
             }
         }
-        public int TSTakeAll(ResourceType resType)
+        public int TSTakeAll(string gameName, string Url, ResourceType resType)
         {
+           
             int total = 0;
             ResourceLock.EnterWriteLock();
             try
@@ -338,7 +343,7 @@ namespace CatanService
                 }
                 if (total > 0)
                 {
-                    TSGlobal.PlayerState.TSAddLogEntry(new MonopolyLog() { PlayerResources = this, Action = ServiceAction.LostToMonopoly, PlayerName = this.PlayerName, Count = total, ResourceType = resType });
+                    TSGlobal.PlayerState.TSAddLogEntry(gameName, new MonopolyLog() { PlayerResources = this, Action = ServiceAction.LostToMonopoly, PlayerName = this.PlayerName, Count = total, ResourceType = resType, RequestUrl=Url });
                 }
                 return total;
             }
@@ -398,21 +403,20 @@ namespace CatanService
     public class GlobalPlayerState
     {
         private ReaderWriterLockSlim DictionaryLock { get; } = new ReaderWriterLockSlim();
-        private Dictionary<PlayerId, ClientState> PlayersToResourcesDictionary { get; } = new Dictionary<PlayerId, ClientState>(new PlayerId()); // given a game, give me a list of users
+        private Dictionary<string, Dictionary<string, ClientState>> GameToPlayerDictionary { get; } = new Dictionary<string, Dictionary<string, ClientState>>();
 
         public bool TSGetPlayerResources(string gameName, string playerName, out ClientState resources)
         {
-
-            var playerId = new PlayerId
-            {
-                GameName = gameName.ToLower(),
-                PlayerName = playerName.ToLower()
-            };
+            gameName = gameName.ToLower();
+            playerName = playerName.ToLower();
 
             DictionaryLock.EnterReadLock();
             try
             {
-                return PlayersToResourcesDictionary.TryGetValue(playerId, out resources);
+                resources = null;
+                bool ret = GameToPlayerDictionary.TryGetValue(gameName.ToLower(), out Dictionary<string, ClientState> playerDictionary);
+                if (!ret) return false;
+                return playerDictionary.TryGetValue(playerName.ToLower(), out resources);
 
             }
             finally
@@ -420,43 +424,61 @@ namespace CatanService
                 DictionaryLock.ExitReadLock();
             }
         }
-        public void TSSetPlayerResources(string gameName, string playerName, ClientState resources)
-        {
-            var playerId = new PlayerId
-            {
-                GameName = gameName.ToLower(),
-                PlayerName = playerName.ToLower()
-            };
 
-            TSSetPlayerResources(playerId, resources);
-        }
-        public void TSSetPlayerResources(PlayerId playerId, ClientState resources)
+
+
+        public bool TSSetPlayerResources(string gameName, string playerName, ClientState clientState)
         {
+            gameName = gameName.ToLower();
+            playerName = playerName.ToLower();
+
             DictionaryLock.EnterWriteLock();
             try
             {
-                PlayersToResourcesDictionary.Add(playerId, resources);
+
+                bool ret = GameToPlayerDictionary.TryGetValue(gameName, out Dictionary<string, ClientState> playerDictionary);
+                if (!ret)
+                {
+                    playerDictionary = new Dictionary<string, ClientState>();
+                    GameToPlayerDictionary.Add(gameName, playerDictionary);
+                }
+
+                
+                ret = playerDictionary.TryGetValue(playerName, out ClientState _);
+                if (ret)
+                {
+                    throw new Exception("You shouldn't add the resources twice!");
+                }
+
+                playerDictionary.Add(playerName, clientState);
+                return true;
             }
             finally
             {
                 DictionaryLock.ExitWriteLock();
             }
+
         }
+
         /// <summary>
         ///     Adds a logEntry to every log.  Note that this is by reference, so the logEntry shoudl be read only.
         /// </summary>
         /// <param name="logEntry"></param>
-        public void TSAddLogEntry(ServiceLogEntry logEntry)
+        public bool TSAddLogEntry(string gameName, ServiceLogEntry logEntry)
         {
+            gameName = gameName.ToLower();
+            
             DictionaryLock.EnterReadLock();
             try
             {
-
-                foreach (var kvp in PlayersToResourcesDictionary)
+                bool ret = GameToPlayerDictionary.TryGetValue(gameName.ToLower(), out Dictionary<string, ClientState> playerDictionary);
+                if (!ret) return false;
+                foreach (var kvp in playerDictionary)
                 {
                     ClientState tracker = kvp.Value;
                     tracker.TSAddLogEntry(logEntry);
                 }
+                return true;
             }
             finally
             {
@@ -468,19 +490,21 @@ namespace CatanService
         /// </summary>
         /// <param name="gameName"></param>
         /// <returns></returns>
-        public void TSReleaseMonitors(string gameName)
+        public bool TSReleaseMonitors(string gameName)
         {
+            gameName = gameName.ToLower();
+            
             DictionaryLock.EnterReadLock();
             try
             {
-
-                foreach (var kvp in PlayersToResourcesDictionary)
+                bool ret = GameToPlayerDictionary.TryGetValue(gameName.ToLower(), out Dictionary<string, ClientState> playerDictionary);
+                if (!ret) return false;
+                foreach (var kvp in playerDictionary)
                 {
-                    if (gameName == kvp.Key.GameName)
-                    {
-                        kvp.Value.TSReleaseLogToClient();
-                    }
+                    kvp.Value.TSReleaseLogToClient();
                 }
+                return true;
+
             }
             finally
             {
@@ -489,18 +513,15 @@ namespace CatanService
         }
         public List<string> TSGetPlayers(string gameName)
         {
+            gameName = gameName.ToLower();
+      
             DictionaryLock.EnterReadLock();
             try
             {
                 List<string> players = new List<string>();
-                foreach (var kvp in PlayersToResourcesDictionary)
-                {
-                    if (gameName == kvp.Key.GameName)
-                    {
-                        players.Add(kvp.Key.PlayerName);
-                    }
-
-                }
+                bool ret = GameToPlayerDictionary.TryGetValue(gameName.ToLower(), out Dictionary<string, ClientState> playerDictionary);
+                if (!ret) return players;
+                players.AddRange(playerDictionary.Keys);
                 return players;
             }
             finally
@@ -513,15 +534,7 @@ namespace CatanService
             DictionaryLock.EnterReadLock();
             try
             {
-                List<string> games = new List<string>();
-                foreach (var kvp in PlayersToResourcesDictionary)
-                {
-                    if (!games.Contains(kvp.Key.GameName))
-                    {
-                        games.Add(kvp.Key.GameName);
-                    }
-
-                }
+                List<string> games = new List<string>(GameToPlayerDictionary.Keys);                
                 return games;
             }
             finally
@@ -531,29 +544,12 @@ namespace CatanService
         }
         public bool TSDeleteGame(string gameName)
         {
+            gameName = gameName.ToLower();
+            
             DictionaryLock.EnterWriteLock();
             try
             {
-                List<KeyValuePair<PlayerId, ClientState>> toRemove = new List<KeyValuePair<PlayerId, ClientState>>();
-                foreach (KeyValuePair<PlayerId, ClientState> kvp in PlayersToResourcesDictionary)
-                {
-                    if (kvp.Key.GameName == gameName)
-                    {
-                        if (!toRemove.Contains(kvp))
-                        {
-                            toRemove.Add(kvp);
-                        }
-                    }
-                }
-
-                if (toRemove.Count == 0) return false;
-
-                foreach (var kvp in toRemove)
-                {
-                    PlayersToResourcesDictionary.Remove(kvp.Key);
-                }
-
-                return true;
+                return GameToPlayerDictionary.Remove(gameName);                              
             }
             finally
             {

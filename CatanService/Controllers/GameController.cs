@@ -35,7 +35,7 @@ namespace CatanService.Controllers
                 };
 
                 TSGlobal.PlayerState.TSSetPlayerResources(gameName, playerName, resources);
-                TSGlobal.PlayerState.TSAddLogEntry(new GameLog() { Players = TSGlobal.PlayerState.TSGetPlayers(gameName), PlayerName = playerName, Action = ServiceAction.PlayerAdded });
+                TSGlobal.PlayerState.TSAddLogEntry(gameName, new GameLog() { Players = TSGlobal.PlayerState.TSGetPlayers(gameName), PlayerName = playerName, Action = ServiceAction.PlayerAdded, RequestUrl = this.Request.Path });
 
             }
             
@@ -60,7 +60,7 @@ namespace CatanService.Controllers
                 return NotFound($"{oldPlayer} in game {gameName} not found");
 
             }
-            TSGlobal.PlayerState.TSAddLogEntry(new TurnLog() { NewPlayer = newPlayer, PlayerName = oldPlayer });
+            TSGlobal.PlayerState.TSAddLogEntry(gameName,new TurnLog() { NewPlayer = newPlayer, PlayerName = oldPlayer, RequestUrl = this.Request.Path });
 
             TSGlobal.PlayerState.TSReleaseMonitors(gameName); 
             return Ok();
@@ -80,7 +80,7 @@ namespace CatanService.Controllers
 
 
             }
-            TSGlobal.PlayerState.TSAddLogEntry(new GameLog() { Players = TSGlobal.PlayerState.TSGetPlayers(gameName), Action = ServiceAction.GameDeleted });
+            TSGlobal.PlayerState.TSAddLogEntry(gameName,new GameLog() { Players = TSGlobal.PlayerState.TSGetPlayers(gameName), Action = ServiceAction.GameDeleted, RequestUrl = this.Request.Path });
             TSGlobal.PlayerState.TSReleaseMonitors(gameName); // this will cause the client monitoring changes to get a list of players from the GameUpdateLog
             return Ok($"{gameName} deleted");
         }
