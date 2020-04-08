@@ -28,7 +28,7 @@ namespace CatanService.Controllers
                 return NotFound($"{playerName} in game { gameName} not found");
 
             }
-            List<ListHelper> list = await resources.TSWaitForLog();
+            List<object> list = await resources.TSWaitForLog();
 
             return Ok(list);
 

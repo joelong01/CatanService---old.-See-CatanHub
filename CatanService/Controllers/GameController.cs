@@ -23,7 +23,7 @@ namespace CatanService.Controllers
 
         [HttpPost("register/{gameName}/{playerName}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public ActionResult<string> RegisterAsync(string gameName, string playerName)
+        public IActionResult Register(string gameName, string playerName)
         {
             bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState resources);
             if (!ret)
@@ -40,13 +40,13 @@ namespace CatanService.Controllers
             }
             
             TSGlobal.PlayerState.TSReleaseMonitors(gameName); // this will cause the client monitoring changes to get a list of players from the GameUpdateLog
-            return Ok(resources.TSSerialize());
+            return Ok(resources);
 
         }
 
         [HttpPost("turn/{gameName}/{oldPlayer}/{newPlayer}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public ActionResult<string> Turn(string gameName, string oldPlayer, string newPlayer)
+        public IActionResult Turn(string gameName, string oldPlayer, string newPlayer)
         {
             bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, oldPlayer, out ClientState _);
             if (!ret)
@@ -71,7 +71,7 @@ namespace CatanService.Controllers
         [Produces("application/json")]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public ActionResult<string> DeleteAsync(string gameName)
+        public IActionResult DeleteAsync(string gameName)
         {
             var ret = TSGlobal.PlayerState.TSDeleteGame(gameName);
             if (!ret)
@@ -90,28 +90,28 @@ namespace CatanService.Controllers
         [HttpGet("users/{gameName}")]
         [Produces("application/json")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public ActionResult<string> GetUsersAsync(string gameName)
+        public IActionResult GetUsersAsync(string gameName)
         {
             var players = TSGlobal.PlayerState.TSGetPlayers(gameName);
             if (players.Count == 0) return Ok($"No Players in game {gameName}");
 
-            return Ok(TSGlobal.Serialize<List<string>>(players));
+            return Ok(players);
         }
 
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public ActionResult<string> GetGamesAsync()
+        public IActionResult GetGamesAsync()
         {
             var games = TSGlobal.PlayerState.TSGetGames();
             if (games.Count == 0) return Ok($"No games currently being played");
 
-            return Ok(TSGlobal.Serialize<List<string>>(games));
+            return Ok(games);
 
         }
 
         [HttpGet("help")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public ActionResult<string> GetHelpAsync()
+        public IActionResult GetHelpAsync()
         {
             return Ok("You have landed on the Catan Service Help page!");
         }

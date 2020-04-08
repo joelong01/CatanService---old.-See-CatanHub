@@ -11,13 +11,6 @@ using System.Threading.Tasks;
 namespace CatanService
 {
 
-    public class ListHelper
-    {
-        public object LogEntry { get; set; }
-        [JsonIgnore]
-        public Type Type { get; set; }
-    }
-
 
     /// <summary>
     ///     this contains all the state assosiated with a particular player. Note that you have 1 player per client
@@ -29,17 +22,18 @@ namespace CatanService
     {
         //
         //  a lock to protect the resources
-        public ReaderWriterLockSlim ResourceLock { get; } = new ReaderWriterLockSlim(); // protects access to this ResourceTracking
-        public TaskCompletionSource<object> ResourceUpdateTaskCompletionSource { get; set; } = null;
-        public TaskCompletionSource<object> LogTaskCompletionSource { get; set; } = null;
-        private List<ListHelper> _log = new List<ListHelper>();
+
+        private ReaderWriterLockSlim ResourceLock { get; } = new ReaderWriterLockSlim(); // protects access to this ResourceTracking
+        private TaskCompletionSource<object> ResourceUpdateTaskCompletionSource { get; set; } = null;
+        private TaskCompletionSource<object> LogTaskCompletionSource { get; set; } = null;
+        private List<object> _log = new List<object>();
         private TaskCompletionSource<object> _tcs;
-        public async Task<List<ListHelper>> TSWaitForLog()
+        public async Task<List<object>> TSWaitForLog()
         {
             if (_tcs != null)
             {
                 //throw new Exception("the TCS shoudl be null in ClientState!");
-                return new List<ListHelper>();
+                return new List<object>();
             }
             var logCopy = TSGetLogEntries();
             if (logCopy.Count != 0)
@@ -53,6 +47,20 @@ namespace CatanService
             return TSGetLogEntries();
 
         }
+
+        public void TSAddDevCard(DevCardType card)
+        {
+            ResourceLock.EnterWriteLock();
+            try
+            {
+                DevCards.Add(new DevelopmentCard() { DevCard = card, Played = false }); 
+            }
+            finally
+            {
+                ResourceLock.ExitWriteLock();
+            }
+        }
+
         public void TSReleaseLogToClient()
         {
             if (_tcs != null) // if this is null, nobody is waiting
@@ -223,11 +231,11 @@ namespace CatanService
         ///     add a log entry in a thread safe way
         /// </summary>
         /// <param name="logEntry"></param>
-        public void TSAddLogEntry(ListHelper helper)
+        public void TSAddLogEntry(object helper)
         {
             ResourceLock.EnterWriteLock();
             try
-            { 
+            {
                 _log.Add(helper);
             }
             finally
@@ -241,12 +249,12 @@ namespace CatanService
         ///     the client changes (because each client runs the UI). easy to cheat by looking at the messages.  will assume good actors
         ///     in the system.
         /// </summary>
-        private List<ListHelper> TSGetLogEntries()
+        private List<object> TSGetLogEntries()
         {
             ResourceLock.EnterWriteLock();
             try
             {
-                var ret = new List<ListHelper>(_log);
+                var ret = new List<object>(_log);
                 _log.Clear();
                 return ret;
             }
@@ -443,39 +451,11 @@ namespace CatanService
             DictionaryLock.EnterReadLock();
             try
             {
-                
-                ListHelper jsonResult;
-
-                switch (logEntry.LogType)
-                {
-                    case ServiceLogType.Resource:
-                        jsonResult = new ListHelper() { LogEntry = logEntry, Type  = typeof(ResourceLog) };
-                        break;
-                    case ServiceLogType.Game:
-                        jsonResult = new ListHelper() { LogEntry = logEntry, Type = typeof(GameLog) };
-                        break;
-                    case ServiceLogType.Purchase:
-                        jsonResult = new ListHelper() { LogEntry = logEntry, Type = typeof(PurchaseLog) };
-                        break;
-                    case ServiceLogType.Trade:
-                        jsonResult = new ListHelper() { LogEntry = logEntry, Type = typeof(TradeLog) };
-                        break;
-                    case ServiceLogType.MeritimeTrade:
-                        jsonResult = new ListHelper() { LogEntry = logEntry, Type = typeof(MeritimeTradeLog) };
-                        break;
-                    case ServiceLogType.Monopoly:
-                        jsonResult = new ListHelper() { LogEntry = logEntry, Type = typeof(MonopolyLog) };
-                        break;
-                    default:
-                        throw new Exception("You forgot to add a LogType case statement!");
-                }
-
 
                 foreach (var kvp in PlayersToResourcesDictionary)
                 {
                     ClientState tracker = kvp.Value;
-                    tracker.TSAddLogEntry(jsonResult);
-                    
+                    tracker.TSAddLogEntry(logEntry);
                 }
             }
             finally
@@ -584,27 +564,69 @@ namespace CatanService
 
     }
 
-    /// <summary>
-    ///     State for a specific game
-    /// 
-    /// </summary>
-
     public class GameState
     {
+        private object _devCardLock = new object();
+        private List<DevCardType> _devCards = new List<DevCardType>();
+        private Random _rand = new Random((int)DateTime.Now.Ticks);
+        public GameState()
+        {
+            const int Knights = 13;
+            const int VictoryPoint = 6;
+            const int YearOfPlenty = 2;
+            const int Monopoly = 2;
+            const int RoadBuilding = 2;
 
+            lock (_devCardLock)
+            {
+
+                for (int i = 0; i < Knights; i++)
+                {
+                    _devCards.Add(DevCardType.Knight);
+                }
+                for (int i = 0; i < VictoryPoint; i++)
+                {
+                    _devCards.Add(DevCardType.VictoryPoint);
+                }
+                for (int i = 0; i < YearOfPlenty; i++)
+                {
+                    _devCards.Add(DevCardType.YearOfPlenty);
+                }
+                for (int i = 0; i < Monopoly; i++)
+                {
+                    _devCards.Add(DevCardType.Monopoly);
+                }
+                for (int i = 0; i < RoadBuilding; i++)
+                {
+                    _devCards.Add(DevCardType.RoadBuilding);
+                }
+
+            }
+
+        }
+
+        public DevCardType TSGetDevCard()
+        {
+
+            lock (_devCardLock)
+            {
+                if (_devCards.Count == 0)
+                {
+                    return DevCardType.Unknown;
+                }
+
+                int index = _rand.Next(_devCards.Count - 1);
+                var ret = _devCards[index];
+                _devCards.RemoveAt(index);
+                return ret;
+            }
+        }
     }
 
-    /// <summary>
-    ///     This class holds state specific to a particular game 
-    /// </summary>
-    ///     
-    public class GlobalGameState
-    {
-
-    }
     public static class TSGlobal
     {
         public static GlobalPlayerState PlayerState { get; } = new GlobalPlayerState();
+        public static GameState GameState { get; } = new GameState();
         public static string Serialize<T>(T obj)
         {
             var options = new JsonSerializerOptions

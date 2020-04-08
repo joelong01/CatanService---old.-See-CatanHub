@@ -24,7 +24,7 @@ namespace CatanService.Controllers
         [HttpGet("{gameName}/{playerName}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public ActionResult<string> GetCards(string gameName, string playerName)
+        public IActionResult GetCards(string gameName, string playerName)
         {
             bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState resources);
             if (!ret)
@@ -32,7 +32,7 @@ namespace CatanService.Controllers
                 return NotFound($"{playerName} in game { gameName} not found");
 
             }
-            return Ok(resources.TSSerialize());
+            return Ok(resources);
         }
 
 
@@ -41,7 +41,7 @@ namespace CatanService.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public ActionResult<string> GrantResources([FromBody] TradeResources toAdd, string gameName, string playerName)
+        public IActionResult GrantResources([FromBody] TradeResources toAdd, string gameName, string playerName)
         {
             bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState resources);
             if (!ret)
@@ -64,7 +64,7 @@ namespace CatanService.Controllers
 
             TSGlobal.PlayerState.TSAddLogEntry(new ResourceLog() { PlayerResources = resources, Action = ServiceAction.GrantResources, PlayerName = playerName, TradeResource=toAdd });
             TSGlobal.PlayerState.TSReleaseMonitors(gameName);
-            return Ok(resources.TSSerialize());
+            return Ok(resources);
 
 
 
@@ -82,7 +82,7 @@ namespace CatanService.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public ActionResult<string> TradeGold([FromBody] TradeResources trade, string gameName, string playerName)
+        public IActionResult TradeGold([FromBody] TradeResources trade, string gameName, string playerName)
         {
             bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState resources);
             if (!ret)
@@ -109,7 +109,7 @@ namespace CatanService.Controllers
             resources.TSAdd(trade);
             TSGlobal.PlayerState.TSAddLogEntry(new ResourceLog() { PlayerResources = resources, Action = ServiceAction.TradeGold, PlayerName = playerName, TradeResource=trade });
             TSGlobal.PlayerState.TSReleaseMonitors(gameName);
-            return Ok(resources.TSSerialize());
+            return Ok(resources);
         }
         /// <summary>
         ///     Executes a Catan trade and logs the results
@@ -123,7 +123,7 @@ namespace CatanService.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public ActionResult<string> Trade([FromBody] TradeResources[] trade, string gameName, string fromName, string toName)
+        public IActionResult Trade([FromBody] TradeResources[] trade, string gameName, string fromName, string toName)
         {
             bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, fromName, out ClientState fromResources);
             if (!ret)
@@ -194,7 +194,7 @@ namespace CatanService.Controllers
 
             TSGlobal.PlayerState.TSAddLogEntry(new TradeLog() { PlayerName = fromName, FromName = fromName, ToName = toName, FromTrade = fromTrade, ToTrade = toTrade, FromResources = fromResources, ToResources = toResources });
             TSGlobal.PlayerState.TSReleaseMonitors(gameName);
-            return Ok(TSGlobal.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
+            return Ok(new PlayerResources[2] { fromResources, toResources });
         }
 
         /// <summary>
@@ -207,7 +207,7 @@ namespace CatanService.Controllers
         [HttpPost("take/{gameName}/{fromName}/{toName}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public ActionResult<string> Take(string gameName, string fromName, string toName)
+        public IActionResult Take(string gameName, string fromName, string toName)
         {
             bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, fromName, out ClientState fromResources);
             ResourceType takenResource = ResourceType.None; ;
@@ -299,7 +299,7 @@ namespace CatanService.Controllers
                 toResources.TSAdd(tradeResource);
                 takenResource = ResourceType.Ore;
 
-                return Ok(TSGlobal.Serialize<PlayerResources[]>(new PlayerResources[2] { fromResources, toResources }));
+                return Ok(new PlayerResources[2] { fromResources, toResources });
             }
             finally
             {
@@ -313,7 +313,7 @@ namespace CatanService.Controllers
         [HttpPost("meritimetrade/{gameName}/{playerName}/{resourceToGive}/{count}/{resourceToGet}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public ActionResult<string> MeritimeTrade(string gameName, string playerName, ResourceType resourceType, int cost)
+        public IActionResult MeritimeTrade(string gameName, string playerName, ResourceType resourceType, int cost)
         {
             bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState playerResources);
 
@@ -335,14 +335,14 @@ namespace CatanService.Controllers
             TSGlobal.PlayerState.TSAddLogEntry(new MeritimeTradeLog() { Cost = cost, PlayerName = playerName, Traded = resourceType });
             TSGlobal.PlayerState.TSReleaseMonitors(gameName);
 
-            return Ok(playerResources.TSSerialize());
+            return Ok(playerResources);
         }
 
 
         [HttpPost("devcard/play/yearofplenty/{gameName}/{playerName}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public ActionResult<string> PlayYearOfPlenty([FromBody] TradeResources tr, string gameName, string playerName)
+        public IActionResult PlayYearOfPlenty([FromBody] TradeResources tr, string gameName, string playerName)
         {
             bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState playerResources);
 
@@ -371,14 +371,14 @@ namespace CatanService.Controllers
 
             playerResources.TSAdd(tr);
             TSGlobal.PlayerState.TSAddLogEntry(new ResourceLog() { PlayerResources = playerResources, Action = ServiceAction.PlayedYearOfPlenty, PlayerName = playerName, TradeResource = tr });
-            return Ok(playerResources.TSSerialize());
+            return Ok(playerResources);
 
         }
 
         [HttpPost("devcard/play/monopoly/{gameName}/{playerName}/{resourceType}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public ActionResult<string> PlayMonopoly(string gameName, string playerName, ResourceType resourceType)
+        public IActionResult PlayMonopoly(string gameName, string playerName, ResourceType resourceType)
         {
             bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState playerResources);
 
@@ -406,12 +406,12 @@ namespace CatanService.Controllers
             TSGlobal.PlayerState.TSAddLogEntry(new MonopolyLog() { PlayerResources = playerResources, Action = ServiceAction.PlayedMonopoly, PlayerName = playerName, ResourceType=resourceType, Count=count }); //logs the gain of cards
             TSGlobal.PlayerState.TSReleaseMonitors(gameName);
 
-            return Ok(playerResources.TSSerialize());
+            return Ok(playerResources);
         }
         [HttpPost("devcard/play/roadbuilding/{gameName}/{playerName}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public ActionResult<string> PlayRoadBuilding(string gameName, string playerName)
+        public IActionResult PlayRoadBuilding(string gameName, string playerName)
         {
             bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState playerResources);
 
@@ -440,7 +440,7 @@ namespace CatanService.Controllers
         [HttpPost("devcard/play/knight/{gameName}/{playerName}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public ActionResult<string> PlayKnight(string gameName, string playerName)
+        public IActionResult PlayKnight(string gameName, string playerName)
         {
             bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState playerResources);
 
@@ -459,7 +459,7 @@ namespace CatanService.Controllers
             TSGlobal.PlayerState.TSAddLogEntry(new ServiceLogEntry() { Action = ServiceAction.PlayedKnight, PlayerName = playerName });
             TSGlobal.PlayerState.TSReleaseMonitors(gameName);
 
-            return Ok(playerResources.TSSerialize());
+            return Ok(playerResources);
         }
     }
 }

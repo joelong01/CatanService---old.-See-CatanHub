@@ -50,7 +50,7 @@ namespace CatanSharedModels
 
     public class TradeResources : INotifyPropertyChanged
     {
-        public event PropertyChangedEventHandler PropertyChanged;
+       public event PropertyChangedEventHandler PropertyChanged;
         private int _wheat = 0;
         private int _wood = 0;
         private int _ore = 0;

@@ -12,7 +12,7 @@ namespace CatanService.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public ActionResult<JsonResult> Purchase(string gameName, string playerName, Entitlement entitlement)
+        public IActionResult Purchase(string gameName, string playerName, Entitlement entitlement)
         {
 
             bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState resources);
@@ -24,15 +24,37 @@ namespace CatanService.Controllers
 
 
             var cost = GetCost(entitlement);
+            if (cost == null)
+            {
+                return BadRequest($"{entitlement} unknown or unset");
+            }
             bool valid = ValidateResources(resources, GetCost(entitlement));
             if (!valid)
             {
                 return BadRequest($"{playerName} does not have the resources necessary to purchase {entitlement}");
             }
+
+            if (entitlement == Entitlement.DevCard)
+            {
+                DevCardType card = TSGlobal.GameState.TSGetDevCard();
+                if (card == DevCardType.Unknown)
+                {
+                    //
+                    //  no more dev cards!
+                    return Ok("No more dev cards available.  no charge"); // TODO
+                }
+
+                resources.TSAddDevCard(card);
+            }
+            else
+            {
+                resources.TSAddEntitlement(entitlement);
+            }
+
             resources.TSAdd(cost.GetNegated());
             TSGlobal.PlayerState.TSAddLogEntry(new PurchaseLog() { Entitlement = entitlement, Action = ServiceAction.Purchased, PlayerResources = resources, PlayerName = playerName });
             TSGlobal.PlayerState.TSReleaseMonitors(gameName);
-            return Ok(resources.TSSerialize());
+            return Ok(resources);
         }
         /// <summary>
         ///     Refunds an Entitlment purchase
@@ -46,7 +68,7 @@ namespace CatanService.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public ActionResult<JsonResult> Refund(string gameName, string playerName, Entitlement entitlement)
+        public IActionResult Refund(string gameName, string playerName, Entitlement entitlement)
         {
 
             bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState resources);
@@ -70,7 +92,7 @@ namespace CatanService.Controllers
             resources.TSAdd(cost.GetNegated());
             TSGlobal.PlayerState.TSAddLogEntry(new PurchaseLog() { Entitlement = entitlement, Action = ServiceAction.Refund, PlayerResources = resources, PlayerName = playerName });
             TSGlobal.PlayerState.TSReleaseMonitors(gameName);
-            return Ok(resources.TSSerialize());
+            return Ok(resources);
         }
 
         private TradeResources GetCost(Entitlement entitlement)
@@ -102,6 +124,12 @@ namespace CatanService.Controllers
                     {
                         Wheat = 2,
                         Ore = 3,
+                    };
+                case Entitlement.Road:
+                    return new TradeResources()
+                    {
+                        Brick = 1,
+                        Wood = 1
                     };
                 default:
                     break;

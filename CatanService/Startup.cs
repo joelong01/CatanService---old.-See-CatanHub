@@ -1,4 +1,6 @@
 using System;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 
@@ -9,10 +11,10 @@ using Microsoft.Extensions.Hosting;
 
 namespace CatanService
 {
-   
+
     public class Startup
     {
-       
+
 
         public Startup(IConfiguration configuration)
         {
@@ -24,9 +26,16 @@ namespace CatanService
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddControllers();
+
+            services.AddControllers().AddJsonOptions(options =>
+            {
+                options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+                options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+
+            });
             
         }
+
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
@@ -36,11 +45,7 @@ namespace CatanService
                 app.UseDeveloperExceptionPage();
             }
 
-            var webSocketOptions = new WebSocketOptions()
-            {
-                KeepAliveInterval = TimeSpan.FromHours(12),
-                ReceiveBufferSize = 4 * 1024
-            };
+
             app.UseRouting();
             app.UseAuthorization();
             app.UseEndpoints(endpoints =>
@@ -48,8 +53,9 @@ namespace CatanService
                 endpoints.MapControllers();
             });
 
-           
+
         }
 
     }
 }
+
