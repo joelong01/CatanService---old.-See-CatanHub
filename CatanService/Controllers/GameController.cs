@@ -11,7 +11,7 @@ namespace CatanService.Controllers
     [Route("api/catan/game")]
     public class GameController : ControllerBase
     {
-        
+
         private readonly ILogger<GameController> _logger;
 
         public GameController(ILogger<GameController> logger)
@@ -23,66 +23,108 @@ namespace CatanService.Controllers
 
         [HttpPost("register/{gameName}/{playerName}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public IActionResult Register(string gameName, string playerName)
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public IActionResult Register([FromBody] GameInfo gameInfo, string gameName, string playerName)
         {
-            bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState resources);
-            if (!ret)
+            var game = TSGlobal.Games.TSFindOrCreateGame(gameName, gameInfo);
+            if (game.GameInfo != gameInfo)
             {
-                resources = new ClientState()
+                var err = new CatanResultWithBody<GameInfo>(gameInfo)
                 {
-                    PlayerName = playerName,
-                    GameName = gameName
+                    Description = $"{playerName} in Game '{gameName}' attempted to register a game with different gameInfo.",
+                    Request = this.Request.Path
+                };
+                err.ExtendedInformation.Add(new KeyValuePair<string, object>("ExistingGameInfo", game));
+                return BadRequest(err);
+            }
+            ClientState clientState = game.GetPlayer(playerName);
+            if (clientState != null)
+            {
+                var err = new CatanResultWithBody<GameInfo>(gameInfo)
+                {
+                    Description = $"{playerName} in Game '{gameName}' is already registered.",
+                    Request = this.Request.Path
+                };
+                err.ExtendedInformation.Add(new KeyValuePair<string, object>("ExistingGameInfo", clientState));
+                return BadRequest(err);
+            }
+
+            clientState = new ClientState()
+            {
+                PlayerName = playerName,
+                GameName = gameName
+            };
+
+            game.TSSetPlayerResources( playerName, clientState);
+            game.TSAddLogEntry( new GameLog() { Players = game.Players, PlayerName = playerName, Action = ServiceAction.PlayerAdded, RequestUrl = this.Request.Path });
+
+
+            return Ok(clientState);
+
+        }
+        [HttpPost("start/{gameName}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult Start(string gameName)
+        {
+            var game = TSGlobal.GetGame(gameName);
+            if (game == null)
+            {
+                var err = new CatanResult()
+                {
+                    Description = $"Game '{gameName}' does not exist",
+                    Request = this.Request.Path
                 };
 
-                TSGlobal.PlayerState.TSSetPlayerResources(gameName, playerName, resources);
-                TSGlobal.PlayerState.TSAddLogEntry(gameName, new GameLog() { Players = TSGlobal.PlayerState.TSGetPlayers(gameName), PlayerName = playerName, Action = ServiceAction.PlayerAdded, RequestUrl = this.Request.Path });
-
+                return NotFound(err);
             }
-            
-            TSGlobal.PlayerState.TSReleaseMonitors(gameName); // this will cause the client monitoring changes to get a list of players from the GameUpdateLog
-            return Ok(resources);
-
+            game.Started = true;
+            game.TSReleaseMonitors();
+            return Ok();
         }
 
         [HttpPost("turn/{gameName}/{oldPlayer}/{newPlayer}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         public IActionResult Turn(string gameName, string oldPlayer, string newPlayer)
         {
-            bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, oldPlayer, out ClientState _);
-            if (!ret)
+            var game = TSGlobal.GetGame(gameName);
+            if (game == null)
             {
-                return NotFound($"{oldPlayer} in game {gameName} not found");
+                return NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+            }
+            if (game.GetPlayer(oldPlayer) == null)
+            {
+                return NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{oldPlayer} in game {gameName} not found" });
+
+            }            
+            if (game.GetPlayer(newPlayer) == null)
+            {
+                return NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{oldPlayer} in game {gameName} not found" });
 
             }
-            ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, newPlayer, out ClientState _);
-            if (!ret)
-            {
-                return NotFound($"{oldPlayer} in game {gameName} not found");
-
-            }
-            TSGlobal.PlayerState.TSAddLogEntry(gameName,new TurnLog() { NewPlayer = newPlayer, PlayerName = oldPlayer, RequestUrl = this.Request.Path });
-
-            TSGlobal.PlayerState.TSReleaseMonitors(gameName); 
+            game.TSAddLogEntry(new TurnLog() { NewPlayer = newPlayer, PlayerName = oldPlayer, RequestUrl = this.Request.Path });
+            game.TSReleaseMonitors();
             return Ok();
         }
 
 
-        [HttpDelete("delete/{gameName}")]
+        [HttpDelete("{gameName}")]
         [Produces("application/json")]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status200OK)]
         public IActionResult DeleteAsync(string gameName)
         {
-            var ret = TSGlobal.PlayerState.TSDeleteGame(gameName);
-            if (!ret)
+            var game = TSGlobal.GetGame(gameName);
+            if (game == null)
             {
-                return NotFound($"{gameName} not found");
-
-
+                return NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
             }
-            TSGlobal.PlayerState.TSAddLogEntry(gameName,new GameLog() { Players = TSGlobal.PlayerState.TSGetPlayers(gameName), Action = ServiceAction.GameDeleted, RequestUrl = this.Request.Path });
-            TSGlobal.PlayerState.TSReleaseMonitors(gameName); // this will cause the client monitoring changes to get a list of players from the GameUpdateLog
-            return Ok($"{gameName} deleted");
+                       
+            TSGlobal.Games.TSDeleteGame(gameName);
+
+            game.TSAddLogEntry(new GameLog() { Players = game.Players, Action = ServiceAction.GameDeleted, RequestUrl = this.Request.Path });
+            game.TSReleaseMonitors(); 
+            return Ok(new CatanResult() { Request = this.Request.Path, Description = $"{gameName} deleted" });
         }
 
 
@@ -90,30 +132,49 @@ namespace CatanService.Controllers
         [HttpGet("users/{gameName}")]
         [Produces("application/json")]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult GetUsersAsync(string gameName)
         {
-            var players = TSGlobal.PlayerState.TSGetPlayers(gameName);
-            if (players.Count == 0) return Ok($"No Players in game {gameName}");
-
-            return Ok(players);
+            var game = TSGlobal.GetGame(gameName);
+            if (game == null)
+            {
+                return NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+            }
+            
+            return Ok(game.Players);
         }
 
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public IActionResult GetGamesAsync()
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult GetGames()
         {
-            var games = TSGlobal.PlayerState.TSGetGames();
-            if (games.Count == 0) return Ok($"No games currently being played");
-
+            var games = TSGlobal.Games.TSGetGames();
             return Ok(games);
+
+        }
+        [HttpGet("gameInfo/{gameName}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult GetGameInfo(string gameName)
+        {
+
+            var game = TSGlobal.GetGame(gameName);
+            if (game == null)
+            {
+                return NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+            }
+
+            
+            return Ok(game.GameInfo);
 
         }
 
         [HttpGet("help")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public IActionResult GetHelpAsync()
+        public IActionResult GetHelp()
         {
-            return Ok("You have landed on the Catan Service Help page!");
+            return Ok(new CatanResult() { Request = this.Request.Path, Description = "You have landed on the Catan Service Help page!" });
         }
 
 

@@ -20,18 +20,30 @@ namespace CatanService.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> MonitorResources(string gameName, string playerName)
         {
+            var game = TSGlobal.GetGame(gameName);
+            if (game == null)
+            {
+                return NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+            }
+            //if (!game.Started)
+            //{
+            //    return BadRequest(new CatanResult() { Request = this.Request.Path, Description = $"{playerName} in '{gameName}' tried to Monitor a game that hasn't started yet." });
+            //}
+
             //
             //  need this to get the TaskCompletionSource
-            bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState resources);
-            if (!ret)
+            var clientState = game.GetPlayer(playerName);
+            
+            if (clientState == null)
             {
-                return NotFound($"{playerName} in game { gameName} not found");
+
+                return NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" });
 
             }
-            List<object> list = await resources.TSWaitForLog();
+            var list = await clientState.TSWaitForLog();
             if (list.Count == 0)
             {
-                return BadRequest($"A client is already registered for this player {playerName}");
+                return BadRequest(new CatanResult() { Request = this.Request.Path, Description = $"Why did {playerName} release with no log entries?" });
             }
             return Ok(list);
 

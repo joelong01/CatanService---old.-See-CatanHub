@@ -97,7 +97,7 @@ namespace CatanSharedModels
     }
     public class GameLog : ServiceLogEntry
     {
-        public List<string> Players { get; set; }
+        public IEnumerable<string> Players { get; set; }
         public GameLog() { LogType = ServiceLogType.Game; }
     }
 }

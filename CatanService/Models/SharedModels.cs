@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 using System.Text.Json.Serialization;
 using System.Text.Json;
 using System.Threading;
+using Microsoft.AspNetCore.Http;
+using System.IO;
+using System.Text;
 
 namespace CatanSharedModels
 {
@@ -17,6 +20,95 @@ namespace CatanSharedModels
     public enum ResourceType { Sheep, Wood, Ore, Wheat, Brick, Desert, Back, None, Sea, GoldMine, VictoryPoint, Knight, YearOfPlenty, RoadBuilding, Monopoly };
     public enum DevCardType { Knight, VictoryPoint, YearOfPlenty, RoadBuilding, Monopoly, Unknown };
 
+    public class GameInfo
+    {
+        public int MaxRoads { get; set; } = 15;
+        public int MaxCities { get; set; } = 4;
+        public int MaxSettlements { get; set; } = 5;
+        public int MaxResourceAllocated { get; set; } = 19; // most aggregate resource per type
+        public bool AllowShips { get; set; } = false;
+        public int Knights { get; set; } = 14;
+        public int VictoryCards { get; set; } = 5;
+        public int YearOfPlenty { get; set; } = 2;
+        public int RoadBuilding { get; set; } = 2;
+        public int Monopoly { get; set; } = 2;
+        public static bool operator ==(GameInfo a, GameInfo b)
+        {
+            return
+                (
+                    a.MaxRoads == b.MaxRoads &&
+                    a.MaxCities == b.MaxCities &&
+                    a.MaxSettlements == b.MaxSettlements &&
+                    a.Knights == b.Knights &&
+                    a.MaxResourceAllocated == b.MaxResourceAllocated &&
+                    a.AllowShips == b.AllowShips &&
+                    a.VictoryCards == b.VictoryCards &&
+                    a.YearOfPlenty == b.YearOfPlenty &&
+                    a.RoadBuilding == b.RoadBuilding &&
+                    a.Monopoly == b.Monopoly
+                );
+        }
+        public static bool operator !=(GameInfo a, GameInfo b)
+        {
+            return !(a == b);
+        }
+        public override bool Equals(object obj)
+        {
+            return (GameInfo)obj == this;
+        }
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(this);
+        }
+    }
+    public class CatanResult
+    {
+        public List<KeyValuePair<string, object>> ExtendedInformation { get; } = new List<KeyValuePair<string, object>>();
+        public string Description { get; set; }
+        public string FunctionName { get; set; }
+        public string FilePath { get; set; }
+        public int LineNumber { get; set; }
+        public string Request { get; set; }
+        public CatanResult( [CallerMemberName] string fName = "", [CallerFilePath] string  codeFile="", [CallerLineNumber] int lineNumber = -1)
+        {
+            FunctionName = fName;
+            FilePath = codeFile;
+            LineNumber = lineNumber;           
+        }
+    }
+    public class CatanResultWithBody<T> : CatanResult
+    {
+        public T Body { get; set; }
+        public CatanResultWithBody(T body, [CallerMemberName] string fName = "", [CallerFilePath] string codeFile = "", [CallerLineNumber] int lineNumber = -1) : base (fName, codeFile, lineNumber)
+        {
+            Body = body;
+        }
+
+    }
+
+    public static class CatanSerializer
+    {
+        static public string Serialize<T>(T obj, bool indented = false)
+        {
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                WriteIndented = indented
+
+            };
+            options.Converters.Add(new JsonStringEnumConverter());
+            return JsonSerializer.Serialize<T>(obj, options);
+        }
+        static public T Deserialize<T>(string json)
+        {
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+            };
+            options.Converters.Add(new JsonStringEnumConverter());
+            return JsonSerializer.Deserialize<T>(json, options);
+        }
+    }
 
     public class DevelopmentCard
     {
@@ -26,7 +118,7 @@ namespace CatanSharedModels
 
     public class TradeResources : INotifyPropertyChanged
     {
-       public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler PropertyChanged;
         private int _wheat = 0;
         private int _wood = 0;
         private int _ore = 0;

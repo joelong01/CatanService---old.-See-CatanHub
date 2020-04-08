@@ -26,10 +26,15 @@ namespace CatanService.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult GetCards(string gameName, string playerName)
         {
-            bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState resources);
-            if (!ret)
+            var game = TSGlobal.GetGame(gameName);
+            if (game == null)
             {
-                return NotFound($"{playerName} in game { gameName} not found");
+                return NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+            }
+            var resources = game.GetPlayer(playerName);
+            if (resources == null)
+            {
+                return NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" });
 
             }
             return Ok(resources);
@@ -43,10 +48,15 @@ namespace CatanService.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public IActionResult GrantResources([FromBody] TradeResources toAdd, string gameName, string playerName)
         {
-            bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState resources);
-            if (!ret)
+            var game = TSGlobal.GetGame(gameName);
+            if (game == null)
             {
-                return NotFound($"{playerName} in game { gameName} not found");
+                return NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+            }
+            var resources = game.GetPlayer(playerName);
+            if (resources == null)
+            {
+                return NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" });
 
             }
             if (toAdd.Wheat < 0 ||
@@ -55,15 +65,15 @@ namespace CatanService.Controllers
                   toAdd.Brick < 0 ||
                   toAdd.Wood < 0)
             {
-                return BadRequest($"{playerName} in game { gameName} is trying to grant a negative resource");
+                return BadRequest(new CatanResultWithBody<TradeResources>(toAdd) { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' is trying to grant a negative resource" });
             }
 
 
             resources.TSAdd(toAdd);
 
 
-            TSGlobal.PlayerState.TSAddLogEntry(gameName,new ResourceLog() { PlayerResources = resources, Action = ServiceAction.GrantResources, PlayerName = playerName, TradeResource=toAdd, RequestUrl = this.Request.Path });
-            TSGlobal.PlayerState.TSReleaseMonitors(gameName);
+            game.TSAddLogEntry( new ResourceLog() { PlayerResources = resources, Action = ServiceAction.GrantResources, PlayerName = playerName, TradeResource = toAdd, RequestUrl = this.Request.Path });
+            game.TSReleaseMonitors();
             return Ok(resources);
 
 
@@ -84,21 +94,26 @@ namespace CatanService.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public IActionResult TradeGold([FromBody] TradeResources trade, string gameName, string playerName)
         {
-            bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState resources);
-            if (!ret)
+            var game = TSGlobal.GetGame(gameName);
+            if (game == null)
             {
-                return NotFound($"{playerName} in game { gameName} not found");
+                return NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+            }
+            var resources = game.GetPlayer(playerName);
+            if (resources == null)
+            {
+                return NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" });
 
             }
 
             if (trade.GoldMine < 0) // not worrying about a read lock here...
             {
-                return BadRequest($"[Player={playerName}] [Game={gameName}]\n in tradegold, the #gold should be positiver instead of {trade.GoldMine}");
+                return BadRequest(new CatanResultWithBody<TradeResources>(trade) { Description = $"[Player={playerName}] [Game='{gameName}'] in tradegold, the #gold should be positiver instead of {trade.GoldMine}" });
             }
             int askCount = trade.Brick + trade.Wood + trade.Wheat + trade.Ore + trade.Sheep;
             if (askCount > resources.GoldMine)
             {
-                return BadRequest($"[Player={playerName}] [Game={gameName}]\n Asking for {askCount} resources, only have {trade.GoldMine} Gold");
+                return BadRequest(new CatanResultWithBody<TradeResources>(trade) { Description = $"[Player={playerName}] [Game='{gameName}'] Asking for {askCount} resources, only have {trade.GoldMine} Gold" });
             }
 
             trade.GoldMine = askCount;
@@ -107,8 +122,8 @@ namespace CatanService.Controllers
             // now lock it so that you change it in a thread safe way
             trade.GoldMine = -trade.GoldMine;
             resources.TSAdd(trade);
-            TSGlobal.PlayerState.TSAddLogEntry(gameName,new ResourceLog() { PlayerResources = resources, Action = ServiceAction.TradeGold, PlayerName = playerName, TradeResource=trade, RequestUrl = this.Request.Path });
-            TSGlobal.PlayerState.TSReleaseMonitors(gameName);
+            game.TSAddLogEntry( new ResourceLog() { PlayerResources = resources, Action = ServiceAction.TradeGold, PlayerName = playerName, TradeResource = trade, RequestUrl = this.Request.Path });
+            game.TSReleaseMonitors();
             return Ok(resources);
         }
         /// <summary>
@@ -125,16 +140,22 @@ namespace CatanService.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public IActionResult Trade([FromBody] TradeResources[] trade, string gameName, string fromName, string toName)
         {
-            bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, fromName, out ClientState fromResources);
-            if (!ret)
+            var game = TSGlobal.GetGame(gameName);
+            if (game == null)
             {
-                return NotFound($"{fromName} in game { gameName} not found");
+                return NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+            }
+            var fromResources = game.GetPlayer(fromName);
+            if (fromResources == null)
+            {
+                return NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{fromName} in game '{gameName}' not found" });
 
             }
-            ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, toName, out ClientState toResources);
-            if (!ret)
+            var toResources = game.GetPlayer(toName);
+            if (toResources == null)
             {
-                return NotFound($"{toName} in game { gameName} not found");
+                return NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{toName} in game '{gameName}' not found" });
+
             }
 
             var fromTrade = trade[0];
@@ -145,45 +166,45 @@ namespace CatanService.Controllers
             //  validate that from has the cards needed
             if (fromResources.Brick < fromTrade.Brick)
             {
-                return BadRequest($"[Player={fromName}] [Game={gameName}]\n Asking for {fromTrade.Brick} Brick, only has {fromResources.Brick}");
+                return BadRequest(new CatanResultWithBody<TradeResources[]>(trade) { Request = this.Request.Path, Description = $"[Player={fromName}] [Game={gameName}]\n Asking for {fromTrade.Brick} Brick, only has {fromResources.Brick}" });
             }
             if (fromResources.Wood < fromTrade.Wood)
             {
-                return BadRequest($"[Player={fromName}] [Game={gameName}]\n Asking for {fromTrade.Wood} Wood, only has {fromResources.Wood}");
+                return BadRequest(new CatanResultWithBody<TradeResources[]>(trade) { Request = this.Request.Path, Description = $"[Player={fromName}] [Game={gameName}]\n Asking for {fromTrade.Wood} Wood, only has {fromResources.Wood}" });
             }
             if (fromResources.Sheep < fromTrade.Sheep)
             {
-                return BadRequest($"[Player={fromName}] [Game={gameName}]\n Asking for {fromTrade.Sheep} Sheep, only has {fromResources.Sheep}");
+                return BadRequest(new CatanResultWithBody<TradeResources[]>(trade) { Request = this.Request.Path, Description = $"[Player={fromName}] [Game={gameName}]\n Asking for {fromTrade.Sheep} Sheep, only has {fromResources.Sheep}" });
             }
             if (fromResources.Ore < fromTrade.Ore)
             {
-                return BadRequest($"[Player={fromName}] [Game={gameName}]\n Asking for {fromTrade.Ore} Ore, only has {fromResources.Ore}");
+                return BadRequest(new CatanResultWithBody<TradeResources[]>(trade) { Request = this.Request.Path, Description = $"[Player={fromName}] [Game={gameName}]\n Asking for {fromTrade.Ore} Ore, only has {fromResources.Ore}" });
             }
             if (fromResources.Wheat < fromTrade.Wheat)
             {
-                return BadRequest($"[Player={fromName}] [Game={gameName}]\n Asking for {fromTrade.Wheat} Wheat, only has {fromResources.Wheat}");
+                return BadRequest(new CatanResultWithBody<TradeResources[]>(trade) { Request = this.Request.Path, Description = $"[Player={fromName}] [Game={gameName}]\n Asking for {fromTrade.Wheat} Wheat, only has {fromResources.Wheat}" });
             }
 
             // validate that To has the cards needed
             if (toResources.Brick < toTrade.Brick)
             {
-                return BadRequest($"[Player={toName}] [Game={gameName}]\n Asking for {toTrade.Brick} Brick, only has {toResources.Brick}");
+                return BadRequest(new CatanResultWithBody<TradeResources[]>(trade) { Request = this.Request.Path, Description = $"[Player={toName}] [Game={gameName}]\n Asking for {toTrade.Brick} Brick, only has {toResources.Brick}" });
             }
             if (toResources.Wood < toTrade.Wood)
             {
-                return BadRequest($"[Player={toName}] [Game={gameName}]\n Asking for {toTrade.Wood} Wood, only has {toResources.Wood}");
+                return BadRequest(new CatanResultWithBody<TradeResources[]>(trade) { Request = this.Request.Path, Description = $"[Player={toName}] [Game={gameName}]\n Asking for {toTrade.Wood} Wood, only has {toResources.Wood}" });
             }
             if (toResources.Sheep < toTrade.Sheep)
             {
-                return BadRequest($"[Player={toName}] [Game={gameName}]\n Asking for {toTrade.Sheep} Sheep, only has {toResources.Sheep}");
+                return BadRequest(new CatanResultWithBody<TradeResources[]>(trade) { Request = this.Request.Path, Description = $"[Player={toName}] [Game={gameName}]\n Asking for {toTrade.Sheep} Sheep, only has {toResources.Sheep}" });
             }
             if (toResources.Ore < toTrade.Ore)
             {
-                return BadRequest($"[Player={toName}] [Game={gameName}]\n Asking for {toTrade.Ore} Ore, only has {toResources.Ore}");
+                return BadRequest(new CatanResultWithBody<TradeResources[]>(trade) { Request = this.Request.Path, Description = $"[Player={toName}] [Game={gameName}]\n Asking for {toTrade.Ore} Ore, only has {toResources.Ore}" });
             }
             if (toResources.Wheat < toTrade.Wheat)
             {
-                return BadRequest($"[Player={toName}] [Game={gameName}]\n Asking for {toTrade.Wheat} Wheat, only has {toResources.Wheat}");
+                return BadRequest(new CatanResultWithBody<TradeResources[]>(trade) { Request = this.Request.Path, Description = $"[Player={toName}] [Game={gameName}]\n Asking for {toTrade.Wheat} Wheat, only has {toResources.Wheat}" });
             }
 
             // take from
@@ -192,8 +213,8 @@ namespace CatanService.Controllers
             fromResources.TSAdd(toTrade);
             toResources.TSAdd(toTrade.GetNegated());
 
-            TSGlobal.PlayerState.TSAddLogEntry(gameName,new TradeLog() { PlayerName = fromName, FromName = fromName, ToName = toName, FromTrade = fromTrade, ToTrade = toTrade, FromResources = fromResources, ToResources = toResources, RequestUrl = this.Request.Path });
-            TSGlobal.PlayerState.TSReleaseMonitors(gameName);
+            game.TSAddLogEntry( new TradeLog() { PlayerName = fromName, FromName = fromName, ToName = toName, FromTrade = fromTrade, ToTrade = toTrade, FromResources = fromResources, ToResources = toResources, RequestUrl = this.Request.Path });
+            game.TSReleaseMonitors();
             return Ok(new PlayerResources[2] { fromResources, toResources });
         }
 
@@ -209,18 +230,22 @@ namespace CatanService.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public IActionResult Take(string gameName, string fromName, string toName)
         {
-            bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, fromName, out ClientState fromResources);
             ResourceType takenResource = ResourceType.None;
-            if (!ret)
+            var game = TSGlobal.GetGame(gameName);
+            if (game == null)
             {
-                return NotFound($"{fromName} in game { gameName} not found");
+                return NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+            }
+            var fromResources = game.GetPlayer(fromName);
+            if (fromResources == null)
+            {
+                return NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{fromName} in game '{gameName}' not found" });
 
             }
-
-            ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, toName, out ClientState toResources);
-            if (!ret)
+            var toResources = game.GetPlayer(toName);
+            if (toResources == null)
             {
-                return NotFound($"{fromName} in game { gameName} not found");
+                return NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{toName} in game '{gameName}' not found" });
 
             }
             //
@@ -304,8 +329,8 @@ namespace CatanService.Controllers
             finally
             {
                 // log it
-                TSGlobal.PlayerState.TSAddLogEntry(gameName,new TakeLog() { PlayerName = fromName, FromName = fromName, ToName = toName, Taken = takenResource, FromResources = fromResources, ToResources = toResources, Action = ServiceAction.TakeCard, RequestUrl = this.Request.Path });
-                TSGlobal.PlayerState.TSReleaseMonitors(gameName);
+                game.TSAddLogEntry( new TakeLog() { PlayerName = fromName, FromName = fromName, ToName = toName, Taken = takenResource, FromResources = fromResources, ToResources = toResources, Action = ServiceAction.TakeCard, RequestUrl = this.Request.Path });
+                game.TSReleaseMonitors();
             }
 
         }
@@ -315,152 +340,34 @@ namespace CatanService.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public IActionResult MeritimeTrade(string gameName, string playerName, ResourceType resourceType, int cost)
         {
-            bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState playerResources);
-
-            if (!ret)
+            var game = TSGlobal.GetGame(gameName);
+            if (game == null)
             {
-                return NotFound($"{playerName} in game { gameName} not found");
+                return NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+            }
+            var playerResources = game.GetPlayer(playerName);
+            if (playerResources == null)
+            {
+                return NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" });
 
             }
+
 
             // make sure they have enough to trade
 
             if (playerResources.TSResourceCount(resourceType) < cost)
             {
-                return BadRequest($"[Player={playerName}] [Game={gameName}]\n needs {cost} of {resourceType} only has {playerResources.TSResourceCount(resourceType)} ");
+                return BadRequest(new CatanResult() { Request = this.Request.Path, Description = $"[Player={playerName}] [Game={gameName}]\n needs {cost} of {resourceType} only has {playerResources.TSResourceCount(resourceType)} " });
             }
 
             playerResources.TSAddResource(resourceType, -cost);
             playerResources.TSAddResource(resourceType, 1);
-            TSGlobal.PlayerState.TSAddLogEntry(gameName,new MeritimeTradeLog() { Cost = cost, PlayerName = playerName, Traded = resourceType, RequestUrl = this.Request.Path });
-            TSGlobal.PlayerState.TSReleaseMonitors(gameName);
-
+            game.TSAddLogEntry( new MeritimeTradeLog() { Cost = cost, PlayerName = playerName, Traded = resourceType, RequestUrl = this.Request.Path });
+            game.TSReleaseMonitors();
             return Ok(playerResources);
         }
 
 
-        [HttpPost("devcard/play/yearofplenty/{gameName}/{playerName}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public IActionResult PlayYearOfPlenty([FromBody] TradeResources tr, string gameName, string playerName)
-        {
-            bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState playerResources);
 
-            if (!ret)
-            {
-                return NotFound($"{playerName} in game {gameName} not found");
-
-            }
-
-            if (tr == null)
-            {
-                return BadRequest($"Year Of Plenty requires a TradeResource in the Body of the request");
-            }
-            int total = tr.Brick + tr.Wheat + tr.Wood + tr.Ore + tr.Sheep;
-            if (total != 2)
-            {
-                return BadRequest($"Year Of Plenty requires a TradeResource to have a total of two resources specified instead of {total}");
-            }
-
-            ret = playerResources.TSPlayDevCard(DevCardType.YearOfPlenty);
-            if (!ret)
-            {
-                return NotFound($"{playerName} in game {gameName} does not have a Year Of Plenty to play.");
-
-            }
-
-            playerResources.TSAdd(tr);
-            TSGlobal.PlayerState.TSAddLogEntry(gameName,new ResourceLog() { PlayerResources = playerResources, Action = ServiceAction.PlayedYearOfPlenty, PlayerName = playerName, TradeResource = tr, RequestUrl = this.Request.Path });
-            return Ok(playerResources);
-
-        }
-
-        [HttpPost("devcard/play/monopoly/{gameName}/{playerName}/{resourceType}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public IActionResult PlayMonopoly(string gameName, string playerName, ResourceType resourceType)
-        {
-            bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState playerResources);
-
-            if (!ret)
-            {
-                return NotFound($"{playerName} in game {gameName} not found");
-
-            }
-            bool set = playerResources.TSPlayDevCard(DevCardType.Monopoly);
-            if (!set)
-            {
-                return NotFound($"{playerName} in game {gameName} does not have a Monopoly to play.");
-            }
-
-            gameName = gameName.ToLower();
-            playerName = playerName.ToLower();
-            int count = 0;
-            foreach (var name in TSGlobal.PlayerState.TSGetPlayers(gameName))
-            {
-                if (name == playerName) continue;
-                TSGlobal.PlayerState.TSGetPlayerResources(gameName, name, out ClientState victim); 
-                count += victim.TSTakeAll(gameName, this.Request.Path, resourceType);// this logs the loss of cards
-            }
-
-            playerResources.TSAdd(count, resourceType);
-            TSGlobal.PlayerState.TSAddLogEntry(gameName,new MonopolyLog() { PlayerResources = playerResources, Action = ServiceAction.PlayedMonopoly, PlayerName = playerName, ResourceType=resourceType, Count=count, RequestUrl = this.Request.Path }); //logs the gain of cards
-            TSGlobal.PlayerState.TSReleaseMonitors(gameName);
-
-            return Ok(playerResources);
-        }
-        [HttpPost("devcard/play/roadbuilding/{gameName}/{playerName}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public IActionResult PlayRoadBuilding(string gameName, string playerName)
-        {
-            bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState playerResources);
-
-            if (!ret)
-            {
-                return NotFound($"{playerName} in game {gameName} not found");
-
-            }
-            bool set = playerResources.TSPlayDevCard(DevCardType.RoadBuilding);
-            if (!set)
-            {
-                return NotFound($"{playerName} in game {gameName} does not have a Road Building card to play.");
-            }
-
-            
-
-            playerResources.TSAddEntitlement(Entitlement.Road);
-            playerResources.TSAddEntitlement(Entitlement.Road);
-
-
-            TSGlobal.PlayerState.TSAddLogEntry(gameName,new ServiceLogEntry() { Action = ServiceAction.PlayedRoadBuilding, PlayerName = playerName, RequestUrl = this.Request.Path}); 
-            TSGlobal.PlayerState.TSReleaseMonitors(gameName);
-
-            return Ok(playerResources);
-        }
-        [HttpPost("devcard/play/knight/{gameName}/{playerName}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public IActionResult PlayKnight(string gameName, string playerName)
-        {
-            bool ret = TSGlobal.PlayerState.TSGetPlayerResources(gameName, playerName, out ClientState playerResources);
-
-            if (!ret)
-            {
-                return NotFound($"{playerName} in game {gameName} not found");
-
-            }
-            bool set = playerResources.TSPlayDevCard(DevCardType.Knight);
-            if (!set)
-            {
-                return NotFound($"{playerName} in game {gameName} does not have a Knight card to play.");
-            }
-
-
-            TSGlobal.PlayerState.TSAddLogEntry(gameName,new ServiceLogEntry() { Action = ServiceAction.PlayedKnight, PlayerName = playerName, RequestUrl = this.Request.Path });
-            TSGlobal.PlayerState.TSReleaseMonitors(gameName);
-
-            return Ok(playerResources);
-        }
     }
 }

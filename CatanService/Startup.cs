@@ -33,7 +33,8 @@ namespace CatanService
                 options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
 
             });
-            
+
+
         }
 
 
