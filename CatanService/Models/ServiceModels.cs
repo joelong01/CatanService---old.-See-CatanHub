@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 
 namespace CatanSharedModels
@@ -29,11 +30,13 @@ namespace CatanSharedModels
 
     public class ServiceLogEntry
     {
+        public Guid LogId { get; set; } = Guid.NewGuid();
         public ServiceLogType LogType { get; set; } = ServiceLogType.Undefined;
         public ServiceAction Action { get; set; } = ServiceAction.Undefined;
         public string PlayerName { get; set; }
         public string RequestUrl { get; set; }
-       
+
+
     }
     public class ResourceLog : ServiceLogEntry
     {
@@ -41,14 +44,15 @@ namespace CatanSharedModels
         public TradeResources TradeResource { get; set; } // needed for Undo
 
         public ResourceLog() { LogType = ServiceLogType.Resource; }
+
     }
 
     public class MonopolyLog : ResourceLog
     {
         public ResourceType ResourceType { get; set; }
         public int Count { get; set; } = 0;
-       public MonopolyLog() { }
-    }   
+        public MonopolyLog() { }
+    }
 
     public class TurnLog : ServiceLogEntry
     {

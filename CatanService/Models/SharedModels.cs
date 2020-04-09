@@ -1,14 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
 using System.Text.Json.Serialization;
 using System.Text.Json;
-using System.Threading;
-using Microsoft.AspNetCore.Http;
-using System.IO;
-using System.Text;
+
 
 namespace CatanSharedModels
 {
@@ -58,7 +53,7 @@ namespace CatanSharedModels
         }
         public override int GetHashCode()
         {
-            return HashCode.Combine(this);
+            return base.GetHashCode();
         }
     }
     public class CatanResult
@@ -69,17 +64,21 @@ namespace CatanSharedModels
         public string FilePath { get; set; }
         public int LineNumber { get; set; }
         public string Request { get; set; }
-        public CatanResult( [CallerMemberName] string fName = "", [CallerFilePath] string  codeFile="", [CallerLineNumber] int lineNumber = -1)
+        public CatanResult()
+        {
+
+        }
+        public CatanResult([CallerMemberName] string fName = "", [CallerFilePath] string codeFile = "", [CallerLineNumber] int lineNumber = -1)
         {
             FunctionName = fName;
             FilePath = codeFile;
-            LineNumber = lineNumber;           
+            LineNumber = lineNumber;
         }
     }
     public class CatanResultWithBody<T> : CatanResult
     {
         public T Body { get; set; }
-        public CatanResultWithBody(T body, [CallerMemberName] string fName = "", [CallerFilePath] string codeFile = "", [CallerLineNumber] int lineNumber = -1) : base (fName, codeFile, lineNumber)
+        public CatanResultWithBody(T body, [CallerMemberName] string fName = "", [CallerFilePath] string codeFile = "", [CallerLineNumber] int lineNumber = -1) : base(fName, codeFile, lineNumber)
         {
             Body = body;
         }
@@ -88,7 +87,7 @@ namespace CatanSharedModels
 
     public static class CatanSerializer
     {
-        static public string Serialize<T>(T obj, bool indented = false)
+        public static JsonSerializerOptions GetOptions(bool indented = false)
         {
             var options = new JsonSerializerOptions
             {
@@ -97,7 +96,12 @@ namespace CatanSharedModels
 
             };
             options.Converters.Add(new JsonStringEnumConverter());
-            return JsonSerializer.Serialize<T>(obj, options);
+            return options;
+        }
+        static public string Serialize<T>(T obj, bool indented = false)
+        {
+
+            return JsonSerializer.Serialize<T>(obj, GetOptions(indented));
         }
         static public T Deserialize<T>(string json)
         {
@@ -245,6 +249,9 @@ namespace CatanSharedModels
                 Brick = -Brick,
             };
         }
+
+        [JsonIgnore]
+        public int Total => Wheat + Wood + Brick + Ore + Sheep;
     }
 
     public class PlayerResources

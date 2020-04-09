@@ -34,14 +34,15 @@ namespace CatanService
         public async Task<List<object>> TSWaitForLog()
         {
             Debug.WriteLine($"Waiting for log for {PlayerName}");
-
+            var logCopy = new List<object>();
             try
             {
+
                 if (_tcs == null)
                 {
-                    //  TCSLock.EnterWriteLock();
+                    
                     _tcs = new TaskCompletionSource<object>();
-                    //  TCSLock.ExitWriteLock();
+                    
                 }
                 else
                 {
@@ -49,20 +50,17 @@ namespace CatanService
 
                 }
                 await _tcs.Task;
-                //TCSLock.EnterWriteLock();
+                
                 _tcs = null;
-                //  TCSLock.ExitWriteLock();
+                
 
-                return TSGetLogEntries();
+                logCopy =  TSGetLogEntries();
+                return logCopy;
             }
             finally
             {
-                if (TCSLock.IsWriteLockHeld)
-                {
-                    TCSLock.ExitWriteLock();
-                }
-                Debug.WriteLine($"returning log for {PlayerName}");
-            }
+                Debug.WriteLine($"returning log for {PlayerName} Count={logCopy.Count} ");
+            } 
 
         }
 
@@ -265,19 +263,23 @@ namespace CatanService
         /// <param name="logEntry"></param>
         public void TSAddLogEntry(object helper)
         {
-            bool tookLock = false;
+            
             if (!ResourceLock.IsWriteLockHeld)
             {
                 ResourceLock.EnterWriteLock();
-                tookLock = true;
+            
             }
             try
-            {
+            {                
                 _log.Add(helper);
+                Debug.WriteLine($"Added log for {PlayerName}. [LogId={((ServiceLogEntry)helper).LogId}] LogCount = {_log.Count}. LogType={((ServiceLogEntry)helper).LogType}");
             }
             finally
             {
-                if (tookLock) ResourceLock.ExitWriteLock();
+                if (ResourceLock.IsWriteLockHeld)
+                {
+                    ResourceLock.ExitWriteLock();
+                }
             }
         }
         /// <summary>
@@ -645,7 +647,7 @@ namespace CatanService
             PlayerLock.EnterReadLock();
             try
             {
-
+                
                 foreach (var kvp in PlayerDictionary)
                 {
                     ClientState tracker = kvp.Value;
