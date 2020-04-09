@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using CatanService.State;
 using CatanSharedModels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -49,7 +46,7 @@ namespace CatanService.Controllers
 
             resources.TSAddDevCard(card);
             resources.TSAdd(cost.GetNegated());
-            game.TSAddLogEntry(new PurchaseLog() { Entitlement = Entitlement.DevCard, Action = ServiceAction.Purchased, PlayerResources = resources, PlayerName = playerName, RequestUrl = this.Request.Path });
+            game.TSAddLogRecord(new PurchaseLog() { Entitlement = Entitlement.DevCard, Action = ServiceAction.Purchased, PlayerResources = resources, PlayerName = playerName, RequestUrl = this.Request.Path });
             game.TSReleaseMonitors();
             return Ok(resources);
         }
@@ -100,7 +97,7 @@ namespace CatanService.Controllers
             }
 
             playerResources.TSAdd(tr);
-            game.TSAddLogEntry(new ResourceLog() { PlayerResources = playerResources, Action = ServiceAction.PlayedYearOfPlenty, PlayerName = playerName, TradeResource = tr, RequestUrl = this.Request.Path });
+            game.TSAddLogRecord(new ResourceLog() { PlayerResources = playerResources, Action = ServiceAction.PlayedYearOfPlenty, PlayerName = playerName, TradeResource = tr, RequestUrl = this.Request.Path });
             return Ok(playerResources);
 
         }
@@ -132,7 +129,7 @@ namespace CatanService.Controllers
             int count = game.TSTakeAll(this.Request.Path, resourceType);
 
             playerResources.TSAdd(count, resourceType);
-            game.TSAddLogEntry(new MonopolyLog() { PlayerResources = playerResources, Action = ServiceAction.PlayedMonopoly, PlayerName = playerName, ResourceType = resourceType, Count = count, RequestUrl = this.Request.Path }); //logs the gain of cards
+            game.TSAddLogRecord(new MonopolyLog() { PlayerResources = playerResources, Action = ServiceAction.PlayedMonopoly, PlayerName = playerName, ResourceType = resourceType, Count = count, RequestUrl = this.Request.Path }); //logs the gain of cards
             game.TSReleaseMonitors();
 
             return Ok(playerResources);
@@ -165,7 +162,7 @@ namespace CatanService.Controllers
             playerResources.TSAddEntitlement(Entitlement.Road);
 
 
-            game.TSAddLogEntry(new ServiceLogEntry() { Action = ServiceAction.PlayedRoadBuilding, PlayerName = playerName, RequestUrl = this.Request.Path });
+            game.TSAddLogRecord(new ServiceLogRecord() { Action = ServiceAction.PlayedRoadBuilding, PlayerName = playerName, RequestUrl = this.Request.Path });
             game.TSReleaseMonitors();
 
             return Ok(playerResources);
@@ -193,7 +190,7 @@ namespace CatanService.Controllers
             }
 
 
-            game.TSAddLogEntry(new ServiceLogEntry() { Action = ServiceAction.PlayedKnight, PlayerName = playerName, RequestUrl = this.Request.Path });
+            game.TSAddLogRecord(new ServiceLogRecord() { Action = ServiceAction.PlayedKnight, PlayerName = playerName, RequestUrl = this.Request.Path });
             game.TSReleaseMonitors();
 
             return Ok(playerResources);

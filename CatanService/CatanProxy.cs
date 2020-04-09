@@ -14,7 +14,7 @@ namespace Catan.Proxy
     public class ProxyResult<T>
     {
         public T Result { get; set; }
-        public string RawJson {get;set;}
+        public string RawJson { get; set; }
         public int ErrorCode { get; set; }
 
     }
@@ -57,7 +57,7 @@ namespace Catan.Proxy
             {
                 throw new Exception("names can't be null or empty");
             }
-            
+
             string url = $"{HostName}/api/catan/game/users/{game}";
 
             return Get<List<string>>(url);
@@ -95,11 +95,11 @@ namespace Catan.Proxy
             {
                 throw new Exception("names can't be null or empty");
             }
-            string url= $"{HostName}/api/catan/game/start/{game}";
+            string url = $"{HostName}/api/catan/game/start/{game}";
             return Post<string>(url, null);
         }
 
-        public async Task<List<ServiceLogEntry>> Monitor(string game, string player)
+        public async Task<List<ServiceLogRecord>> Monitor(string game, string player)
         {
             if (String.IsNullOrEmpty(game))
             {
@@ -112,15 +112,15 @@ namespace Catan.Proxy
                 AllowTrailingCommas = true
             };
 
-          //  this.TraceMessage($"{json}");
-            List<ServiceLogEntry> logList = new List<ServiceLogEntry>();
+            //  this.TraceMessage($"{json}");
+            List<ServiceLogRecord> logList = new List<ServiceLogRecord>();
             using (JsonDocument document = JsonDocument.Parse(Encoding.UTF8.GetBytes(json), options))
             {
-                
+
                 foreach (JsonElement element in document.RootElement.EnumerateArray())
                 {
-                  //  this.TraceMessage($"{element}");
-                    ServiceLogEntry logEntry = CatanSerializer.Deserialize<ServiceLogEntry>(element.GetRawText());
+                    //  this.TraceMessage($"{element}");
+                    ServiceLogRecord logEntry = CatanSerializer.Deserialize<ServiceLogRecord>(element.GetRawText());
                     Debug.WriteLine($"Log Received.  [ID={logEntry.LogId}] [Player={logEntry.PlayerName}]");
                     switch (logEntry.Action)
                     {
@@ -171,7 +171,7 @@ namespace Catan.Proxy
                     }
                 }
 
-                
+
             }
             Debug.WriteLine($"[Game={game}] [Player={player}] [LogCount={logList.Count}]");
             return logList;
@@ -200,7 +200,7 @@ namespace Catan.Proxy
             var body = CatanSerializer.Serialize<TradeResources[]>(new TradeResources[] { from, to });
             return Post<List<PlayerResources>>(url, body);
         }
-        
+
 
         private async Task<T> Get<T>(string url)
         {
@@ -323,7 +323,7 @@ namespace Catan.Proxy
                 {
                     response = await Client.PostAsync(url, new StringContent("", Encoding.UTF8, "application/json"));
                 }
-                
+
                 string json = await response.Content.ReadAsStringAsync();
                 if (typeof(T) == typeof(string))
                 {

@@ -27,9 +27,26 @@ namespace CatanSharedModels
         PlayedKnight,
         PlayedYearOfPlenty
     }
-
-    public class ServiceLogEntry
+    /// <summary>
+    ///     returned by Monitor.  
+    ///         Sequence number used to ensure that no records are missed at the client
+    ///         Count is used to verify/test marshaling of LogRecords
+    ///         LogRecords are the data you actually want
+    ///         
+    ///         LogRecords is a List<object> so that the Serializer will serialize
+    ///         all of the information in the derived classes
+    /// </summary>
+    public class ServiceLogCollection
     {
+        public int SequenceNumber { get; set; }
+        public int Count { get; set; }        
+        public List<object> LogRecords { get; set; }
+        public Guid CollectionId { get; set; }
+    }
+
+    public class ServiceLogRecord
+    {
+        public int Sequence { get; set; }
         public Guid LogId { get; set; } = Guid.NewGuid();
         public ServiceLogType LogType { get; set; } = ServiceLogType.Undefined;
         public ServiceAction Action { get; set; } = ServiceAction.Undefined;
@@ -38,7 +55,7 @@ namespace CatanSharedModels
 
 
     }
-    public class ResourceLog : ServiceLogEntry
+    public class ResourceLog : ServiceLogRecord
     {
         public PlayerResources PlayerResources { get; set; } // this is not needed for Undo, but is needed for each of the games to update their UI
         public TradeResources TradeResource { get; set; } // needed for Undo
@@ -54,13 +71,13 @@ namespace CatanSharedModels
         public MonopolyLog() { }
     }
 
-    public class TurnLog : ServiceLogEntry
+    public class TurnLog : ServiceLogRecord
     {
         public string NewPlayer { get; set; } = "";
         public TurnLog() { LogType = ServiceLogType.UpdateTurn; Action = ServiceAction.UpdatedTurn; }
     }
 
-    public class TradeLog : ServiceLogEntry
+    public class TradeLog : ServiceLogRecord
     {
         public TradeLog() { LogType = ServiceLogType.Trade; }
         public TradeResources FromTrade { get; set; }
@@ -72,7 +89,7 @@ namespace CatanSharedModels
         public string ToName { get; set; }
 
     }
-    public class TakeLog : ServiceLogEntry
+    public class TakeLog : ServiceLogRecord
     {
         public TakeLog() { LogType = ServiceLogType.TakeCard; }
         public ResourceType Taken { get; set; }
@@ -85,7 +102,7 @@ namespace CatanSharedModels
     }
 
 
-    public class MeritimeTradeLog : ServiceLogEntry
+    public class MeritimeTradeLog : ServiceLogRecord
     {
         public MeritimeTradeLog() { LogType = ServiceLogType.MeritimeTrade; Action = ServiceAction.MeritimeTrade; }
         public ResourceType Traded { get; set; }
@@ -93,13 +110,13 @@ namespace CatanSharedModels
         public PlayerResources Resources { get; set; }
 
     }
-    public class PurchaseLog : ServiceLogEntry
+    public class PurchaseLog : ServiceLogRecord
     {
         public Entitlement Entitlement { get; set; }
         public PlayerResources PlayerResources { get; set; }
         public PurchaseLog() { LogType = ServiceLogType.Purchase; }
     }
-    public class GameLog : ServiceLogEntry
+    public class GameLog : ServiceLogRecord
     {
         public IEnumerable<string> Players { get; set; }
         public GameLog() { LogType = ServiceLogType.Game; }

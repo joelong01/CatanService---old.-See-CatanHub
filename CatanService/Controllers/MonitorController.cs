@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text.Json;
-using System.Text.Json.Serialization;
+﻿using CatanService.State;
 using System.Threading.Tasks;
 using CatanSharedModels;
 using Microsoft.AspNetCore.Http;
@@ -40,12 +37,12 @@ namespace CatanService.Controllers
                 return NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" });
 
             }
-            var list = await clientState.TSWaitForLog();
-            if (list.Count == 0)
+            var logCollection = await clientState.TSWaitForLog();
+            if (logCollection.Count == 0)
             {
                 return BadRequest(new CatanResult() { Request = this.Request.Path, Description = $"Why did {playerName} release with no log entries?" });
             }
-            return Ok(list);
+            return Ok(logCollection);
 
         }
 

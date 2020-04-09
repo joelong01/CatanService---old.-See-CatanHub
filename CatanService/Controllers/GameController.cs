@@ -1,9 +1,10 @@
-﻿using CatanSharedModels;
+﻿using CatanService.State;
+using CatanSharedModels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
-using System.Text.Json;
+
 
 namespace CatanService.Controllers
 {
@@ -37,7 +38,7 @@ namespace CatanService.Controllers
                 err.ExtendedInformation.Add(new KeyValuePair<string, object>("ExistingGameInfo", game));
                 return BadRequest(err);
             }
-            ClientState clientState = game.GetPlayer(playerName);
+            PlayerState clientState = game.GetPlayer(playerName);
             if (clientState != null)
             {
                 var err = new CatanResultWithBody<GameInfo>(gameInfo)
@@ -49,14 +50,16 @@ namespace CatanService.Controllers
                 return BadRequest(err);
             }
 
-            clientState = new ClientState()
+            clientState = new PlayerState()
             {
                 PlayerName = playerName,
                 GameName = gameName
             };
 
             game.TSSetPlayerResources( playerName, clientState);
-            game.TSAddLogEntry( new GameLog() { Players = game.Players, PlayerName = playerName, Action = ServiceAction.PlayerAdded, RequestUrl = this.Request.Path });
+           
+            //
+            // do not add a Log record -- the client gets the list of players when one of them calls Start
 
 
             return Ok(clientState);
@@ -79,6 +82,8 @@ namespace CatanService.Controllers
                 return NotFound(err);
             }
             game.Started = true;
+            game.TSAddLogRecord(new GameLog() { Players = game.Players, PlayerName = "", Action = ServiceAction.PlayerAdded, RequestUrl = this.Request.Path });
+
             game.TSReleaseMonitors();
             return Ok();
         }
@@ -102,7 +107,23 @@ namespace CatanService.Controllers
                 return NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{oldPlayer} in game {gameName} not found" });
 
             }
-            game.TSAddLogEntry(new TurnLog() { NewPlayer = newPlayer, PlayerName = oldPlayer, RequestUrl = this.Request.Path });
+            game.TSAddLogRecord(new TurnLog() { NewPlayer = newPlayer, PlayerName = oldPlayer, RequestUrl = this.Request.Path });
+            game.TSReleaseMonitors();
+            return Ok();
+        }
+
+        [HttpPost("turnorder/{gameName}/{oldPlayer}/{newPlayer}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public IActionResult TurnOrder(string gameName, List<string> players)
+        {
+            var game = TSGlobal.GetGame(gameName);
+            if (game == null)
+            {
+                return NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+            }
+
+            game.TSSetPlayerOrder(players);
+           
             game.TSReleaseMonitors();
             return Ok();
         }
@@ -122,7 +143,7 @@ namespace CatanService.Controllers
                        
             TSGlobal.Games.TSDeleteGame(gameName);
 
-            game.TSAddLogEntry(new GameLog() { Players = game.Players, Action = ServiceAction.GameDeleted, RequestUrl = this.Request.Path });
+            game.TSAddLogRecord(new GameLog() { Players = game.Players, Action = ServiceAction.GameDeleted, RequestUrl = this.Request.Path });
             game.TSReleaseMonitors(); 
             return Ok(new CatanResult() { Request = this.Request.Path, Description = $"{gameName} deleted" });
         }

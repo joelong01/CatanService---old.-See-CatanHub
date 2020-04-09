@@ -1,4 +1,5 @@
-﻿using CatanSharedModels;
+﻿using CatanService.State;
+using CatanSharedModels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -51,7 +52,7 @@ namespace CatanService.Controllers
 
 
 
-        public static bool ValidateResources(ClientState resources, TradeResources cost)
+        public static bool ValidateResources(PlayerState resources, TradeResources cost)
         {
             if (cost.Wheat > resources.Wheat ||
                cost.Sheep > resources.Sheep ||
@@ -120,7 +121,7 @@ namespace CatanService.Controllers
             }
 
             resources.TSAdd(cost.GetNegated());
-            game.TSAddLogEntry( new PurchaseLog() { Entitlement = entitlement, Action = ServiceAction.Purchased, PlayerResources = resources, PlayerName = playerName, RequestUrl = this.Request.Path });
+            game.TSAddLogRecord( new PurchaseLog() { Entitlement = entitlement, Action = ServiceAction.Purchased, PlayerResources = resources, PlayerName = playerName, RequestUrl = this.Request.Path });
             game.TSReleaseMonitors();
             return Ok(resources);
         }
@@ -163,7 +164,7 @@ namespace CatanService.Controllers
 
 
             resources.TSAdd(cost.GetNegated());
-            game.TSAddLogEntry( new PurchaseLog() { Entitlement = entitlement, Action = ServiceAction.Refund, PlayerResources = resources, PlayerName = playerName, RequestUrl = this.Request.Path });
+            game.TSAddLogRecord( new PurchaseLog() { Entitlement = entitlement, Action = ServiceAction.Refund, PlayerResources = resources, PlayerName = playerName, RequestUrl = this.Request.Path });
             game.TSReleaseMonitors();
             return Ok(resources);
         }
