@@ -7,6 +7,7 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace Catan.Proxy
@@ -41,7 +42,7 @@ namespace Catan.Proxy
             }
             string url = $"{HostName}/api/catan/game/register/{gameName}/{playerName}";
 
-            return Post<PlayerResources>(url, CatanSerializer.Serialize<GameInfo>(info));
+            return Post<PlayerResources>(url, CatanProxy.Serialize<GameInfo>(info));
 
         }
         public Task<List<string>> GetGames()
@@ -120,18 +121,18 @@ namespace Catan.Proxy
                 foreach (JsonElement element in document.RootElement.EnumerateArray())
                 {
                     //  this.TraceMessage($"{element}");
-                    ServiceLogRecord logEntry = CatanSerializer.Deserialize<ServiceLogRecord>(element.GetRawText());
+                    ServiceLogRecord logEntry = CatanProxy.Deserialize<ServiceLogRecord>(element.GetRawText());
                     Debug.WriteLine($"Log Received.  [ID={logEntry.LogId}] [Player={logEntry.PlayerName}]");
                     switch (logEntry.Action)
                     {
                         case ServiceAction.Undefined:
                             break;
                         case ServiceAction.Purchased:
-                            PurchaseLog purchaseLog = CatanSerializer.Deserialize<PurchaseLog>(element.GetRawText());
+                            PurchaseLog purchaseLog = Deserialize<PurchaseLog>(element.GetRawText());
                             logList.Add(purchaseLog);
                             break;
                         case ServiceAction.PlayerAdded:
-                            GameLog gameLog = CatanSerializer.Deserialize<GameLog>(element.GetRawText());
+                            GameLog gameLog = Deserialize<GameLog>(element.GetRawText());
                             logList.Add(gameLog);
                             break;
                         case ServiceAction.UserRemoved:
@@ -143,7 +144,7 @@ namespace Catan.Proxy
                         case ServiceAction.TradeGold:
                             break;
                         case ServiceAction.GrantResources:
-                            ResourceLog resourLog = CatanSerializer.Deserialize<ResourceLog>(element.GetRawText());
+                            ResourceLog resourLog = Deserialize<ResourceLog>(element.GetRawText());
                             logList.Add(resourLog);
                             break;
                         case ServiceAction.TradeResources:
@@ -177,7 +178,7 @@ namespace Catan.Proxy
             return logList;
         }
 
-        //_ = await client.PostAsync($"{_hostName}/api/catan/resource/grant/{GameName}/{player.PlayerResources.PlayerName}", new StringContent(CatanSerializer.Serialize<PlayerResources>(resources), Encoding.UTF8, "application/json"));
+        //_ = await client.PostAsync($"{_hostName}/api/catan/resource/grant/{GameName}/{player.PlayerResources.PlayerName}", new StringContent(CatanProxy.Serialize<PlayerResources>(resources), Encoding.UTF8, "application/json"));
 
         public Task<PlayerResources> GrantResources(string game, string player, TradeResources resources)
         {
@@ -186,7 +187,7 @@ namespace Catan.Proxy
                 throw new Exception("names can't be null or empty");
             }
             string url = $"{HostName}/api/catan/resource/grant/{game}/{player}";
-            var body = CatanSerializer.Serialize<TradeResources>(resources);
+            var body = CatanProxy.Serialize(resources);
             return Post<PlayerResources>(url, body);
         }
 
@@ -197,7 +198,7 @@ namespace Catan.Proxy
                 throw new Exception("names can't be null or empty");
             }
             string url = $"{HostName}/api/catan/resource/trade/{game}/{fromPlayer}/{toPlayer}";
-            var body = CatanSerializer.Serialize<TradeResources[]>(new TradeResources[] { from, to });
+            var body = CatanProxy.Serialize<TradeResources[]>(new TradeResources[] { from, to });
             return Post<List<PlayerResources>>(url, body);
         }
 
@@ -225,7 +226,7 @@ namespace Catan.Proxy
                     T workaround = (T)(object)json;
                     return workaround;
                 }
-                T obj = CatanSerializer.Deserialize<T>(json);
+                T obj = CatanProxy.Deserialize<T>(json);
                 return obj;
 
 
@@ -237,7 +238,7 @@ namespace Catan.Proxy
                 LastErrorString = json;
                 try
                 {
-                    LastError = CatanSerializer.Deserialize<CatanResult>(json);
+                    LastError = Deserialize<CatanResult>(json);
                 }
                 catch
                 {
@@ -273,7 +274,7 @@ namespace Catan.Proxy
                 var json = await response.Content.ReadAsStringAsync();
                 if (response.IsSuccessStatusCode)
                 {
-                    T obj = CatanSerializer.Deserialize<T>(json);
+                    T obj = CatanProxy.Deserialize<T>(json);
                     return obj;
                 }
                 else
@@ -281,7 +282,7 @@ namespace Catan.Proxy
                     LastErrorString = await response.Content.ReadAsStringAsync();
                     try
                     {
-                        LastError = CatanSerializer.Deserialize<CatanResult>(LastErrorString);
+                        LastError = CatanProxy.Deserialize<CatanResult>(LastErrorString);
                         return default;
                     }
                     catch
@@ -332,7 +333,7 @@ namespace Catan.Proxy
                 }
                 if (response.IsSuccessStatusCode)
                 {
-                    T obj = CatanSerializer.Deserialize<T>(json);
+                    T obj = CatanProxy.Deserialize<T>(json);
                     return obj;
                 }
                 else
@@ -340,7 +341,7 @@ namespace Catan.Proxy
                     LastErrorString = await response.Content.ReadAsStringAsync();
                     try
                     {
-                        LastError = CatanSerializer.Deserialize<CatanResult>(LastErrorString);
+                        LastError = CatanProxy.Deserialize<CatanResult>(LastErrorString);
                         return default;
                     }
                     catch
@@ -362,5 +363,32 @@ namespace Catan.Proxy
         {
             Client.Dispose();
         }
+
+        public static JsonSerializerOptions GetOptions(bool indented = false)
+        {
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                WriteIndented = indented
+
+            };
+            options.Converters.Add(new JsonStringEnumConverter());
+            return options;
+        }
+        static public string Serialize<T>(T obj, bool indented = false)
+        {
+
+            return JsonSerializer.Serialize<T>(obj, GetOptions(indented));
+        }
+        static public T Deserialize<T>(string json)
+        {
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+            };
+            options.Converters.Add(new JsonStringEnumConverter());
+            return JsonSerializer.Deserialize<T>(json, options);
+        }
     }
+
 }

@@ -85,35 +85,6 @@ namespace CatanSharedModels
 
     }
 
-    public static class CatanSerializer
-    {
-        public static JsonSerializerOptions GetOptions(bool indented = false)
-        {
-            var options = new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true,
-                WriteIndented = indented
-
-            };
-            options.Converters.Add(new JsonStringEnumConverter());
-            return options;
-        }
-        static public string Serialize<T>(T obj, bool indented = false)
-        {
-
-            return JsonSerializer.Serialize<T>(obj, GetOptions(indented));
-        }
-        static public T Deserialize<T>(string json)
-        {
-            var options = new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true,
-            };
-            options.Converters.Add(new JsonStringEnumConverter());
-            return JsonSerializer.Deserialize<T>(json, options);
-        }
-    }
-
     public class DevelopmentCard
     {
         public DevCardType DevCard { get; set; } = DevCardType.Unknown;
