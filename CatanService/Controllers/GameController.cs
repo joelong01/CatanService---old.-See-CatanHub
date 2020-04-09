@@ -133,7 +133,7 @@ namespace CatanService.Controllers
         [Produces("application/json")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult GetUsersAsync(string gameName)
+        public IActionResult GetUsers(string gameName)
         {
             var game = TSGlobal.GetGame(gameName);
             if (game == null)

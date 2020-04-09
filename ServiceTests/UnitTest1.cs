@@ -42,8 +42,5 @@ namespace ServiceTests
             ServiceProvider.Dispose();
         }
     }
-    public class BasicTests
-    { 
 
-    }
 }
