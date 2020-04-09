@@ -2,16 +2,16 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Catan.Proxy
 {
+
     public class ProxyResult<T>
     {
         public T Result { get; set; }
@@ -25,7 +25,7 @@ namespace Catan.Proxy
 
 
         public HttpClient Client { get; set; } = new HttpClient();
-
+        private CancellationTokenSource _cts = new CancellationTokenSource();
         public string HostName { get; set; } // "http://localhost:50919";
         public CatanResult LastError { get; set; } = null;
         public string LastErrorString { get; set; } = "";
@@ -108,74 +108,67 @@ namespace Catan.Proxy
             }
             string url = $"{HostName}/api/catan/monitor/{game}/{player}";
             string json = await Get<string>(url);
-            var options = new JsonDocumentOptions()
-            {
-                AllowTrailingCommas = true
-            };
 
-            //  this.TraceMessage($"{json}");
-            List<ServiceLogRecord> logList = new List<ServiceLogRecord>();
-            using (JsonDocument document = JsonDocument.Parse(Encoding.UTF8.GetBytes(json), options))
+            ServiceLogCollection serviceLogCollection = CatanProxy.Deserialize<ServiceLogCollection>(json);
+            List<ServiceLogRecord> records = new List<ServiceLogRecord>();
+            foreach (var rec in serviceLogCollection.LogRecords)
             {
-
-                foreach (JsonElement element in document.RootElement.EnumerateArray())
+                //
+                //  we have to Deserialize to the Header to find out what kind of object we have - this means we double Deserialize the object
+                //  we could avoid this by serializing a list of Actions to matach 
+                ServiceLogRecord logEntry = CatanProxy.Deserialize<ServiceLogRecord>(rec.ToString());
+                switch (logEntry.Action)
                 {
-                    //  this.TraceMessage($"{element}");
-                    ServiceLogRecord logEntry = CatanProxy.Deserialize<ServiceLogRecord>(element.GetRawText());
-                    Debug.WriteLine($"Log Received.  [ID={logEntry.LogId}] [Player={logEntry.PlayerName}]");
-                    switch (logEntry.Action)
-                    {
-                        case ServiceAction.Undefined:
-                            break;
-                        case ServiceAction.Purchased:
-                            PurchaseLog purchaseLog = Deserialize<PurchaseLog>(element.GetRawText());
-                            logList.Add(purchaseLog);
-                            break;
-                        case ServiceAction.PlayerAdded:
-                            GameLog gameLog = Deserialize<GameLog>(element.GetRawText());
-                            logList.Add(gameLog);
-                            break;
-                        case ServiceAction.UserRemoved:
-                            break;
-                        case ServiceAction.GameCreated:
-                            break;
-                        case ServiceAction.GameDeleted:
-                            break;
-                        case ServiceAction.TradeGold:
-                            break;
-                        case ServiceAction.GrantResources:
-                            ResourceLog resourLog = Deserialize<ResourceLog>(element.GetRawText());
-                            logList.Add(resourLog);
-                            break;
-                        case ServiceAction.TradeResources:
-                            break;
-                        case ServiceAction.TakeCard:
-                            break;
-                        case ServiceAction.Refund:
-                            break;
-                        case ServiceAction.MeritimeTrade:
-                            break;
-                        case ServiceAction.UpdatedTurn:
-                            break;
-                        case ServiceAction.LostToMonopoly:
-                            break;
-                        case ServiceAction.PlayedMonopoly:
-                            break;
-                        case ServiceAction.PlayedRoadBuilding:
-                            break;
-                        case ServiceAction.PlayedKnight:
-                            break;
-                        case ServiceAction.PlayedYearOfPlenty:
-                            break;
-                        default:
-                            break;
-                    }
+                    case ServiceAction.Undefined:
+                        break;
+                    case ServiceAction.Purchased:
+
+                        break;
+                    case ServiceAction.PlayerAdded:
+                        GameLog gameLog = CatanProxy.Deserialize<GameLog>(rec.ToString());
+                        records.Add(gameLog);
+                        break;
+                    case ServiceAction.UserRemoved:
+                        break;
+                    case ServiceAction.GameCreated:
+                        break;
+                    case ServiceAction.GameDeleted:
+                        break;
+                    case ServiceAction.TradeGold:
+                        break;
+                    case ServiceAction.GrantResources:
+                        ResourceLog resourceLog = CatanProxy.Deserialize<ResourceLog>(rec.ToString());
+                        records.Add(resourceLog);
+                        break;
+                    case ServiceAction.TradeResources:
+                        break;
+                    case ServiceAction.TakeCard:
+                        break;
+                    case ServiceAction.Refund:
+                        break;
+                    case ServiceAction.MeritimeTrade:
+                        break;
+                    case ServiceAction.UpdatedTurn:
+                        break;
+                    case ServiceAction.LostToMonopoly:
+                        break;
+                    case ServiceAction.PlayedMonopoly:
+                        break;
+                    case ServiceAction.PlayedRoadBuilding:
+                        break;
+                    case ServiceAction.PlayedKnight:
+                        break;
+                    case ServiceAction.PlayedYearOfPlenty:
+                        break;
+                    default:
+                        break;
                 }
 
 
+
             }
-            Debug.WriteLine($"[Game={game}] [Player={player}] [LogCount={logList.Count}]");
-            return logList;
+            //Debug.WriteLine($"[Game={game}] [Player={player}] [LogCount={logList.Count}]");
+            return records;
         }
 
         //_ = await client.PostAsync($"{_hostName}/api/catan/resource/grant/{GameName}/{player.PlayerResources.PlayerName}", new StringContent(CatanProxy.Serialize<PlayerResources>(resources), Encoding.UTF8, "application/json"));
@@ -187,7 +180,7 @@ namespace Catan.Proxy
                 throw new Exception("names can't be null or empty");
             }
             string url = $"{HostName}/api/catan/resource/grant/{game}/{player}";
-            var body = CatanProxy.Serialize(resources);
+            var body = CatanProxy.Serialize<TradeResources>(resources);
             return Post<PlayerResources>(url, body);
         }
 
@@ -219,15 +212,23 @@ namespace Catan.Proxy
             string json = "";
             try
             {
-
-                json = await Client.GetStringAsync(url);
-                if (typeof(T) == typeof(string))
+                var response = await Client.GetAsync(url, _cts.Token);
+                if (response.IsSuccessStatusCode)
                 {
-                    T workaround = (T)(object)json;
-                    return workaround;
+                    json = await response.Content.ReadAsStringAsync();
+
+                    if (typeof(T) == typeof(string))
+                    {
+                        T workaround = (T)(object)json;
+                        return workaround;
+                    }
+                    T obj = CatanProxy.Deserialize<T>(json);
+                    return obj;
                 }
-                T obj = CatanProxy.Deserialize<T>(json);
-                return obj;
+                else
+                {
+                    Debug.WriteLine($"Error grom GetAsync: {response} {Environment.NewLine} {response.ReasonPhrase}");
+                }
 
 
             }
@@ -238,7 +239,7 @@ namespace Catan.Proxy
                 LastErrorString = json;
                 try
                 {
-                    LastError = Deserialize<CatanResult>(json);
+                    LastError = CatanProxy.Deserialize<CatanResult>(json);
                 }
                 catch
                 {
@@ -270,7 +271,7 @@ namespace Catan.Proxy
             try
             {
 
-                var response = await Client.DeleteAsync(url);
+                var response = await Client.DeleteAsync(url, _cts.Token);
                 var json = await response.Content.ReadAsStringAsync();
                 if (response.IsSuccessStatusCode)
                 {
@@ -318,7 +319,7 @@ namespace Catan.Proxy
                 HttpResponseMessage response;
                 if (body != null)
                 {
-                    response = await Client.PostAsync(url, new StringContent(body, Encoding.UTF8, "application/json"));
+                    response = await Client.PostAsync(url, new StringContent(body, Encoding.UTF8, "application/json"), _cts.Token);
                 }
                 else
                 {
@@ -363,8 +364,7 @@ namespace Catan.Proxy
         {
             Client.Dispose();
         }
-
-        public static JsonSerializerOptions GetOptions(bool indented = false)
+        public static JsonSerializerOptions GetJsonOptions(bool indented = false)
         {
             var options = new JsonSerializerOptions
             {
@@ -377,8 +377,7 @@ namespace Catan.Proxy
         }
         static public string Serialize<T>(T obj, bool indented = false)
         {
-
-            return JsonSerializer.Serialize<T>(obj, GetOptions(indented));
+            return JsonSerializer.Serialize<T>(obj, GetJsonOptions(indented));
         }
         static public T Deserialize<T>(string json)
         {
@@ -390,5 +389,4 @@ namespace Catan.Proxy
             return JsonSerializer.Deserialize<T>(json, options);
         }
     }
-
 }
