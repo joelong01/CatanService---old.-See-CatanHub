@@ -25,7 +25,7 @@ namespace Catan.Proxy
 
 
         public HttpClient Client { get; set; } = new HttpClient();
-        private CancellationTokenSource _cts = new CancellationTokenSource();
+        private CancellationTokenSource _cts = new CancellationTokenSource(TimeSpan.FromDays(1));
         public string HostName { get; set; } // "http://localhost:50919";
         public CatanResult LastError { get; set; } = null;
         public string LastErrorString { get; set; } = "";
@@ -33,7 +33,7 @@ namespace Catan.Proxy
         {
             Client.Timeout = TimeSpan.FromHours(5);
         }
-        
+
         public Task<PlayerResources> Register(GameInfo info, string gameName, string playerName)
         {
 
@@ -49,7 +49,7 @@ namespace Catan.Proxy
 
         public Task<PlayerResources> BuyEntitlement(string gameName, string playerName, Entitlement entitlement)
         {
-            if(String.IsNullOrEmpty(gameName) || String.IsNullOrEmpty(playerName))
+            if (String.IsNullOrEmpty(gameName) || String.IsNullOrEmpty(playerName))
             {
                 throw new Exception("names can't be null or empty");
             }
@@ -68,7 +68,7 @@ namespace Catan.Proxy
             return Get<PlayerResources>(url);
         }
 
-       
+
 
         public Task<PlayerResources> DevCardPurchase(string game, string player)
         {
@@ -91,6 +91,9 @@ namespace Catan.Proxy
 
             return Post<PlayerResources>(url, Serialize(tr));
         }
+
+
+
         public Task<PlayerResources> PlayRoadBuilding(string game, string player)
         {
             if (String.IsNullOrEmpty(game) || String.IsNullOrEmpty(player))
@@ -143,7 +146,7 @@ namespace Catan.Proxy
 
         }
 
-       
+
 
         public Task<CatanResult> DeleteGame(string gameName)
         {
@@ -184,7 +187,7 @@ namespace Catan.Proxy
             return records;
         }
 
-        private List<ServiceLogRecord>  ParseServiceLogRecord(ServiceLogCollection serviceLogCollection)
+        private List<ServiceLogRecord> ParseServiceLogRecord(ServiceLogCollection serviceLogCollection)
         {
             List<ServiceLogRecord> records = new List<ServiceLogRecord>();
             foreach (var rec in serviceLogCollection.LogRecords)
@@ -243,7 +246,7 @@ namespace Catan.Proxy
             return records;
         }
 
-        public async Task<List<List<ServiceLogRecord>>> GetAllLogs(string game, string player, int startAt)
+        public async Task<List<ServiceLogRecord>> GetAllLogs(string game, string player, int startAt)
         {
             if (String.IsNullOrEmpty(game))
             {
@@ -253,16 +256,12 @@ namespace Catan.Proxy
             string json = await Get<string>(url);
             if (String.IsNullOrEmpty(json)) return null;
 
-            List<ServiceLogCollection> response = CatanProxy.Deserialize<List<ServiceLogCollection>>(json);
+            ServiceLogCollection serviceLogCollection = CatanProxy.Deserialize<ServiceLogCollection>(json);
+            List<ServiceLogRecord> records = ParseServiceLogRecord(serviceLogCollection);
+            return records;
 
-            List<List<ServiceLogRecord>> ret = new List<List<ServiceLogRecord>>();
-            foreach (ServiceLogCollection logCollection in response)
-            {
-                List<ServiceLogRecord> records = ParseServiceLogRecord(logCollection);
-                ret.Add(records);
-            }
 
-            return ret;
+
         }
 
         /// <summary>
@@ -291,6 +290,22 @@ namespace Catan.Proxy
             }
             string url = $"{HostName}/api/catan/resource/return/{game}/{player}";
             var body = CatanProxy.Serialize<TradeResources>(resources);
+            return Post<PlayerResources>(url, body);
+        }
+
+        public Task<PlayerResources> UndoGrantResource(string game, ResourceLog lastLogRecord)
+        {
+            if (lastLogRecord is null)
+            {
+                throw new Exception("log record can't be null");
+            }
+            if (String.IsNullOrEmpty(game) || String.IsNullOrEmpty(lastLogRecord.PlayerName))
+            {
+                throw new Exception("names can't be null or empty");
+            }
+
+            string url = $"{HostName}/api/catan/resource/undo/{game}";
+            var body = CatanProxy.Serialize<ResourceLog>(lastLogRecord);
             return Post<PlayerResources>(url, body);
         }
         public Task<List<PlayerResources>> Trade(string game, string fromPlayer, TradeResources from, string toPlayer, TradeResources to)

@@ -289,11 +289,8 @@ namespace ServiceTests
                 
                 resources = await helper.Proxy.PlayRoadBuilding(helper.GameName, players[0]);
                 Assert.NotNull(resources);
-                Assert.Equal(2, resources.Entitlements.Count);
-                Assert.True(resources.Entitlements[0] == Entitlement.Road);
-                Assert.True(resources.Entitlements[1] == Entitlement.Road);
-
-
+                Assert.Equal(2, resources.Roads);
+                
             }
         }
     }

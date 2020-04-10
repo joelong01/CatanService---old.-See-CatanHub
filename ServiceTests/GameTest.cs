@@ -33,11 +33,9 @@ namespace ServiceTests
                 bool contains = games.Contains(helper.GameName.ToLower());
                 Assert.True(contains);
                 games = await helper.Proxy.GetGames();
-                List<List<ServiceLogRecord>> logCollection = await helper.Proxy.GetAllLogs(helper.GameName, helper.Players[0], 0);
-                Assert.NotNull(logCollection);
-                Assert.NotEmpty(logCollection);
-                Assert.NotEmpty(logCollection[0]);
-                GameLog gameLog = logCollection[0][0] as GameLog;
+
+
+                GameLog gameLog = await helper.GetLastLogRecord<GameLog>();
                 Assert.Equal(ServiceAction.PlayerAdded, gameLog.Action);
                 Assert.Equal(ServiceLogType.Game, gameLog.LogType);
                 Assert.NotEmpty(gameLog.Players);

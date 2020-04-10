@@ -26,33 +26,42 @@ namespace ServiceTests
             using (helper)
             {
                 var players = await helper.CreateGame();
-
-                
+                const int startingResourceCount = 1;
+                var startingResource = new TradeResources()
+                {
+                    Wood = startingResourceCount,
+                    Wheat = startingResourceCount,
+                    Brick = startingResourceCount,
+                    Ore = startingResourceCount,
+                    GoldMine = startingResourceCount,
+                    Sheep = startingResourceCount
+                };
+                var startingResources = await helper.Proxy.GrantResources(helper.GameName, players[0], startingResource);
+                Assert.True(startingResources.EquivalentResourceCount(startingResource));
                 foreach (ResourceType restype in Enum.GetValues(typeof(ResourceType)))
                 {
                     // 
-                    // grant each resource ...
-                    ResourceType grantedResource = restype;
-                    var tr = new TradeResources() { };
+                    // grant each resource one at a time, then undo it.                    
+                    var loopTempResourceAsk = new TradeResources() { };
                     switch (restype)
                     {
                         case ResourceType.Sheep:
-                            tr.Sheep++;
+                            loopTempResourceAsk.Sheep++;
                             break;
                         case ResourceType.Wood:
-                            tr.Wood++;
+                            loopTempResourceAsk.Wood++;
                             break;
                         case ResourceType.Ore:
-                            tr.Ore++;
+                            loopTempResourceAsk.Ore++;
                             break;
                         case ResourceType.Wheat:
-                            tr.Wheat++;
+                            loopTempResourceAsk.Wheat++;
                             break;
                         case ResourceType.Brick:
-                            tr.Brick++;
+                            loopTempResourceAsk.Brick++;
                             break;
                         case ResourceType.GoldMine:
-                            tr.GoldMine++;
+                            loopTempResourceAsk.GoldMine++;
                             break;
                         case ResourceType.Desert:
                         case ResourceType.Back:
@@ -62,32 +71,44 @@ namespace ServiceTests
                             continue;
                     }
 
-                    
 
-                    var resource = await helper.Proxy.GrantResources(helper.GameName, players[0], tr);
+
+                    var resource = await helper.Proxy.GrantResources(helper.GameName, players[0], loopTempResourceAsk);
                     Assert.NotNull(resource);
                     //
-                    //  should have one of these...
-                    
-                    Assert.Equal(1, resource.GetResourceCount(grantedResource));
+                    //  make sure we got what we asked for
+                    Assert.True(resource.EquivalentResourceCount(loopTempResourceAsk + startingResource));
+
+
+
                     //
-                    //  make sure all the others are zero.  
-                    foreach (ResourceType rt in Enum.GetValues(typeof(ResourceType)))
-                    {
-                        if (rt == grantedResource) continue;                       
-                        Assert.Equal(0, resource.GetResourceCount(rt));                        
-                    }
+                    //  get the log record - it should have resources we just granted
+                    var lastLogRecord = await helper.GetLastLogRecord<ResourceLog>();
+                    Assert.True(lastLogRecord.PlayerResources.Equivalent(resource));
+                    Assert.True(lastLogRecord.TradeResource.Equivalent(loopTempResourceAsk));
+
+                    // undo the grant -- we should be back where we started
+                    var resourcesAfterUndo = await helper.Proxy.UndoGrantResource(helper.GameName, lastLogRecord);
+                    Assert.True(resourcesAfterUndo.Equivalent(startingResources));
+
                     //
-                    //  return the resource
-                    resource = await helper.Proxy.ReturnResource(helper.GameName, players[0], tr);
-                    Assert.NotNull(resource);
+                    //  get the log for the Undo Action
+                    lastLogRecord = await helper.GetLastLogRecord<ResourceLog>();
+                    Assert.Equal(ServiceAction.GrantResources, lastLogRecord.Action);
+                    Assert.True(lastLogRecord.PlayerResources.Equivalent(resourcesAfterUndo));
+                    Assert.Equal(players[0], lastLogRecord.PlayerName);
+
+
+
                     //
-                    //  all resources should be zero
-                    foreach (ResourceType rt in Enum.GetValues(typeof(ResourceType)))
-                    {
-                        Debug.WriteLine($"{rt}={resource.GetResourceCount(rt)}");
-                        Assert.Equal(0, resource.GetResourceCount(rt));
-                    }
+                    //  double check by getting the resources from the serice
+                    //  we should be back where we started
+                    resourcesAfterUndo = await helper.Proxy.GetResources(helper.GameName, players[0]);
+                    Assert.True(resourcesAfterUndo.Equivalent(startingResources));
+
+
+
+
                 }
             }
         }

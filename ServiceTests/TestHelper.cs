@@ -44,8 +44,8 @@ namespace ServiceTests
 
             Players = await Proxy.GetUsers(GameName);
             Assert.Equal(4, Players.Count);
-          //  _timer = new Timer(OnTimerCallback, _timer, 0, 0);
-            
+            //  _timer = new Timer(OnTimerCallback, _timer, 0, 0);
+
             return Players;
         }
 
@@ -61,12 +61,27 @@ namespace ServiceTests
                     LogCollection.Add(logs);
                     break;
                 }
-                
+
             } while (logs != null);
 
             Debug.WriteLine("Exiting Timer thread");
         }
+        public async Task<T> GetLastLogRecord<T>()
+        {
+            List<ServiceLogRecord> logCollection = await Proxy.GetAllLogs(GameName, Players[0], 0);
+            if (logCollection == null)
+            {
+                Debug.WriteLine($"LogCollection is null! {this.Proxy.LastError} {this.Proxy.LastErrorString}");
+            }
+            Assert.NotNull(logCollection);
+            Assert.NotEmpty(logCollection);
+            
+            T ret =  (T)(object)logCollection[^1];
+            Assert.NotNull(ret);
+            return ret;
 
+
+        }
 
         public async Task<PlayerResources> GrantResourcesAndAssertResult(string player, TradeResources tr)
         {
@@ -98,7 +113,7 @@ namespace ServiceTests
             };
             PlayerResources resources;
             do
-            {                
+            {
                 _ = await GrantResourcesAndAssertResult(player, tr);
                 resources = await Proxy.DevCardPurchase(GameName, player);
                 Assert.NotNull(resources);

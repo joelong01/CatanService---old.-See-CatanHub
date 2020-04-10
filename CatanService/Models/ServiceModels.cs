@@ -22,7 +22,8 @@ namespace CatanSharedModels
         MissingData,
         BadTradeResources,
         NoResource,
-        BadEntitlement
+        BadEntitlement,
+        BadParameter
     }
     /// <summary>
     ///     this enum tells us what the data was used for. We often have data shapes for only one reason...

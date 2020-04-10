@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using CatanSharedModels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Collections.Generic;
 
 namespace CatanService.Controllers
 {
@@ -65,9 +66,9 @@ namespace CatanService.Controllers
                 return NotFound(new CatanResult() {Error = CatanError.NoPlayerWithThatName, Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" });
 
             }
-            
-            
-            return Ok(clientState.GetLogCollection(startAt));
+
+            ServiceLogCollection response = clientState.GetLogCollection(startAt);
+            return Ok(response);
 
         }
 

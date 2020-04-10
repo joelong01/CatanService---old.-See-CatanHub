@@ -9,13 +9,16 @@ namespace CatanService.State
 {
     public class PlayerState : PlayerResources
     {
+       
         //
         //  a lock to protect the resources
         private ReaderWriterLockSlim ResourceLock { get; } = new ReaderWriterLockSlim(); // protects access to this ResourceTracking
-        private List<object> _log = new List<object>();
+        private List<object> _log = new List<object>(); // this one gets wiped every time TSWaitForLog returns
+        private List<object> _permLog = new List<object>(); // this one has *everything*
+        private List<ServiceLogCollection> _logCollectionList = new List<ServiceLogCollection>();
         private TaskCompletionSource<object> _tcs = null;
         private ReaderWriterLockSlim TCSLock { get; } = new ReaderWriterLockSlim(); // protects access to this ResourceTracking
-        private List<ServiceLogCollection> _logCollectionList = new List<ServiceLogCollection>();
+        
         public GameInfo ResourcesLeft { get; set; } // a game info where we will keep track of how many resources we can allocate
 
         public bool TSFreeEntitlement(Entitlement entitlement)
@@ -90,28 +93,29 @@ namespace CatanService.State
                 ResourceLock.ExitWriteLock();
             }
         }
-        public List<ServiceLogCollection> GetLogCollection(int startAtSequenceNumber)
+        public ServiceLogCollection GetLogCollection(int startAtSequenceNumber)
         {
-           // ResourceLock.EnterReadLock();
+            ResourceLock.EnterReadLock();
             try
             {
-                var list = new List<ServiceLogCollection>();
-                
-                for (int i = startAtSequenceNumber; i < _logCollectionList.Count; i++)
+
+                var list = new List<object>();
+                for (int i=startAtSequenceNumber; i<_permLog.Count -1; i++)
                 {
-                    list.Add(_logCollectionList[i]);
-                }
-                ServiceLogCollection lc = GetLatestLogCollection();
-                if (lc != null)
-                {
-                    list.Add(lc);
+                    list.Add(_permLog[i]);
                 }
 
-                return list;
+                return new ServiceLogCollection()
+                {
+                    LogRecords = new List<object>(_permLog),
+                    SequenceNumber = _permLog.Count,
+                    Count = _permLog.Count - startAtSequenceNumber,
+                    CollectionId = Guid.NewGuid()
+                };
             }
             finally
             {
-              //  ResourceLock.ExitReadLock();
+                ResourceLock.ExitReadLock();
             }
         }
 
@@ -140,6 +144,7 @@ namespace CatanService.State
                 ServiceLogCollection logCollection = GetLatestLogCollection();
                 _logCollectionList.Add(logCollection);
                 return logCollection;
+               
             }
             finally
             {
@@ -351,7 +356,7 @@ namespace CatanService.State
         ///     add a log entry in a thread safe way
         /// </summary>
         /// <param name="logEntry"></param>
-        public void TSAddLogRecord(object helper)
+        public void TSAddLogRecord(object logEntry)
         {
 
             if (!ResourceLock.IsWriteLockHeld)
@@ -361,8 +366,9 @@ namespace CatanService.State
             }
             try
             {
-                _log.Add(helper);
-                Debug.WriteLine($"Added log for {PlayerName}. [LogId={((ServiceLogRecord)helper).LogId}] LogCount = {_log.Count}. LogType={((ServiceLogRecord)helper).LogType}");
+                _log.Add(logEntry);
+                _permLog.Add(logEntry);
+                Debug.WriteLine($"Added log for {PlayerName}. [LogId={((ServiceLogRecord)logEntry).LogId}] LogCount = {_log.Count}. LogType={((ServiceLogRecord)logEntry).LogType}");
             }
             finally
             {
@@ -410,9 +416,7 @@ namespace CatanService.State
                     Sheep = this.Sheep,
                     GoldMine = this.GoldMine,
                     PlayerName = this.PlayerName,
-                    GameName = this.GameName,
-                    Entitlements = new List<Entitlement>(this.Entitlements),
-                    DevCards = new List<DevelopmentCard>(this.DevCards),
+                    GameName = this.GameName,                   
                 };
 
                 return pr;
@@ -427,7 +431,24 @@ namespace CatanService.State
             ResourceLock.EnterWriteLock();
             try
             {
-                this.Entitlements.Add(entitlement);
+                switch (entitlement)
+                {
+                    
+                    case Entitlement.DevCard:
+                        break;
+                    case Entitlement.Settlement:
+                        this.Settlements++;
+                        break;
+                    case Entitlement.City:
+                        this.Cities++;
+                        break;
+                    case Entitlement.Road:
+                        this.Roads++;
+                        break;
+                    case Entitlement.Undefined:                       
+                    default:
+                        throw new Exception("Undefined Entitlment in TSAddEntitlement");
+                }                
             }
             finally
             {
@@ -440,7 +461,29 @@ namespace CatanService.State
             ResourceLock.EnterWriteLock();
             try
             {
-                return this.Entitlements.Remove(entitlement);
+
+                switch (entitlement)
+                {
+
+                    case Entitlement.DevCard:
+                        break;
+                    case Entitlement.Settlement:
+                        if (this.Settlements == 0) return false;
+                        this.Settlements--;
+                        break;
+                    case Entitlement.City:
+                        if (this.Cities == 0) return false;
+                        this.Cities--;
+                        break;
+                    case Entitlement.Road:
+                        if (this.Roads == 0) return false;
+                        this.Roads--;
+                        break;
+                    case Entitlement.Undefined:
+                    default:
+                        throw new Exception("Undefined Entitlment in TSAddEntitlement");
+                } 
+                return true;
             }
             finally
             {

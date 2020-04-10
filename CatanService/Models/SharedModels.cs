@@ -92,6 +92,7 @@ namespace CatanSharedModels
         public string FilePath { get; set; }
         public int LineNumber { get; set; }
         public string Request { get; set; }
+        public Guid ID { get; set; } = Guid.NewGuid(); // this gives us an ID at creation time that survives serialization and is globally unique
         public CatanError Error { get; set; } = CatanError.Unknown;
         public CatanResult() // for the Serializer
         {
@@ -102,6 +103,67 @@ namespace CatanSharedModels
             FunctionName = fName;
             FilePath = codeFile;
             LineNumber = lineNumber;
+        }
+        public static bool operator ==(CatanResult a, CatanResult b)
+        {
+            if (a is null)
+            {
+                if (b is null)
+                {
+                    return true;
+                }
+
+                return false;
+            }
+
+            if (a.ExtendedInformation?.Count != b.ExtendedInformation?.Count)
+            {
+                return false;
+            }
+            if (a.ExtendedInformation != null)
+            {
+                if (b.ExtendedInformation == null) return false;
+                for (int i = 0; i < a.ExtendedInformation?.Count; i++)
+                {
+                    if (a.ExtendedInformation[i].Key != b.ExtendedInformation[i].Key)
+                    {
+                        return false;
+                    }
+
+                    //
+                    //  going to ignore the value for now
+                }
+            }
+
+            return
+                (
+                    a.Description == b.Description &&
+                    a.FunctionName == b.FunctionName &&
+                    a.FilePath == b.FilePath &&
+                    a.LineNumber == b.LineNumber &&
+                    a.Request == b.Request &&
+                    a.Error == b.Error
+                 );
+
+        }
+        public override int GetHashCode()
+        {
+            int hash = 17;
+            hash = hash * 97 + Description.GetHashCode();
+            hash = hash * 97 + FunctionName.GetHashCode();
+            hash = hash * 97 + FilePath.GetHashCode();
+            hash = hash * 97 + LineNumber.GetHashCode();
+            hash = hash * 97 + Request.GetHashCode();
+            hash = hash * 97 + Error.GetHashCode();
+            return hash;
+        }
+        public static bool operator !=(CatanResult a, CatanResult b)
+        {
+            return !(a == b);
+        }
+        public override bool Equals(object obj)
+        {
+            return (CatanResult)obj == this;
         }
     }
     public class CatanResultWithBody<T> : CatanResult
@@ -141,7 +203,20 @@ namespace CatanSharedModels
         private int _goldMine = 0;
 
         public TradeResources() { }
-
+        //
+        //  useful for the Resource Tests
+        public static TradeResources operator +(TradeResources a, TradeResources b)
+        {
+            return new TradeResources()
+            {
+                Wheat = a.Wheat +   b.Wheat,
+                Wood = a.Wood +     b.Wood,
+                Ore = a.Ore +       b.Ore,
+                Sheep = a.Sheep +   b.Sheep,
+                Brick = a.Brick +   b.Brick,
+                GoldMine = a.GoldMine + b.GoldMine
+            };
+        }
         public TradeResources(TradeResources tradeResources)
         {
             Wheat = this.Wheat;
@@ -260,6 +335,18 @@ namespace CatanSharedModels
                 GoldMine = -GoldMine
             };
         }
+        public bool Equivalent(TradeResources tradeResources)
+        {
+            if (Wheat != tradeResources.Wheat || Wood != tradeResources.Wood || Ore != tradeResources.Ore ||
+                Sheep != tradeResources.Sheep || Brick != tradeResources.Brick || GoldMine != tradeResources.GoldMine)
+            {
+
+                return false;
+
+            }
+
+            return true;
+        }
 
         [JsonIgnore]
         public int Total => Wheat + Wood + Brick + Ore + Sheep + GoldMine;
@@ -267,6 +354,7 @@ namespace CatanSharedModels
 
     public class PlayerResources
     {
+        public Guid ID { get; set; } = Guid.NewGuid(); // this gives us an ID at creation time that survives serialization and is globally unique
         public string PlayerName { get; set; } = "";
         public string GameName { get; set; } = "";
         public int Wheat { get; set; } = 0;
@@ -275,8 +363,12 @@ namespace CatanSharedModels
         public int Sheep { get; set; } = 0;
         public int Brick { get; set; } = 0;
         public int GoldMine { get; set; } = 0;
+        public int Settlements { get; set; } = 0;
+        public int Cities { get; set; } = 0;
+        public int Roads { get; set; } = 0;
+
         public List<DevelopmentCard> DevCards { get; set; } = new List<DevelopmentCard>();
-        public List<Entitlement> Entitlements { get; set; } = new List<Entitlement>();
+
 
         [JsonIgnore]
         public int TotalResources => Wheat + Wood + Brick + Ore + Sheep + GoldMine;
@@ -309,5 +401,58 @@ namespace CatanSharedModels
             return 0;
         }
 
+        public bool EquivalentResourceCount(TradeResources tradeResources)
+        {
+            if (Wheat != tradeResources.Wheat || Wood != tradeResources.Wood || Ore != tradeResources.Ore ||
+                Sheep != tradeResources.Sheep || Brick != tradeResources.Brick || GoldMine != tradeResources.GoldMine)
+            {
+
+                return false;
+
+            }
+
+            return true;
+        }
+        public bool Equivalent(PlayerResources pr)
+        {
+            if (pr.DevCards == null)
+            {
+                if (this.DevCards != null)
+                {
+                    return false;
+                }
+            }
+
+            if (PlayerName != pr.PlayerName || GameName != pr.GameName ||
+                Wheat != pr.Wheat || Wood != pr.Wood || Ore != pr.Ore ||
+                Sheep != pr.Sheep || Brick != pr.Brick || GoldMine != pr.GoldMine ||
+                Settlements != pr.Settlements || Cities != pr.Cities || Roads != pr.Roads)
+            {
+
+                return false;
+
+            }
+
+            if (pr.DevCards != null)
+            {
+                if (pr.DevCards.Count != this.DevCards.Count)
+                {
+                    return false;
+                }
+                for (int i = 0; i < DevCards.Count; i++)
+                {
+                    if (!pr.DevCards[i].Equals(DevCards[i]))
+                        return false;
+                }
+            }
+
+
+            return true;
+
+
+
+        }
     }
+
 }
+

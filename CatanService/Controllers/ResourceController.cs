@@ -11,12 +11,12 @@ using System;
 namespace CatanService.Controllers
 {
     [Route("api/catan/resource")]
-    public class ResourceCardController : Controller
+    public class ResourceController : Controller
     {
 
         private readonly ILogger<GameController> _logger;
 
-        public ResourceCardController(ILogger<GameController> logger)
+        public ResourceController(ILogger<GameController> logger)
         {
             _logger = logger;
         }
@@ -59,7 +59,38 @@ namespace CatanService.Controllers
 
 
         }
+        [HttpPost("undo/{gameName}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public IActionResult UndoGrantResources([FromBody] ResourceLog log, string gameName)
+        {
+            if (log == null)
+            {
+                return BadRequest(new CatanResult() {Error = CatanError.BadParameter, Description = "ResourceLog is null", Request = Request.Path });
+            }
+            (Game game, PlayerResources resources, IActionResult iaResult) = InternalPurchase(log.TradeResource, gameName, log.PlayerName, false);
+            if (iaResult != null)
+            {
+                return iaResult;
+            }
 
+
+            game.TSAddLogRecord(new ResourceLog()
+            {
+                PlayerResources = resources,
+                Action = ServiceAction.ReturnResources,
+                PlayerName = log.PlayerName,
+                TradeResource = log.TradeResource,
+                RequestUrl = this.Request.Path,                
+            });
+
+            game.TSReleaseMonitors();
+            return Ok(resources);
+
+
+
+        }
         private (Game, PlayerResources, IActionResult) InternalPurchase(TradeResources toAdd, string gameName, string playerName, bool add)
         {
             var game = TSGlobal.GetGame(gameName);

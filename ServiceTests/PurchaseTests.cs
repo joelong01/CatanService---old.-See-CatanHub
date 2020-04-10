@@ -21,7 +21,7 @@ namespace ServiceTests
             {
                 var resources = await PurchaseAll(helper, Entitlement.Road, new TradeResources() { Brick = 1, Wood = 1 });
 
-                Assert.Equal(helper.GameInfo.MaxRoads, resources.Entitlements.Count);
+                Assert.Equal(helper.GameInfo.MaxRoads, resources.Roads);
             }
 
 
@@ -31,9 +31,9 @@ namespace ServiceTests
             TestHelper helper = new TestHelper();
             using (helper)
             {
-                var resources = await PurchaseAll(helper, Entitlement.Road, new TradeResources() { Ore = 3, Wheat = 2 });
+                var resources = await PurchaseAll(helper, Entitlement.City, new TradeResources() { Ore = 3, Wheat = 2 });
 
-                Assert.Equal(helper.GameInfo.MaxRoads, resources.Entitlements.Count);
+                Assert.Equal(helper.GameInfo.MaxCities, resources.Cities);
             }
 
 
@@ -44,9 +44,9 @@ namespace ServiceTests
             TestHelper helper = new TestHelper();
             using (helper)
             {
-                var resources = await PurchaseAll(helper, Entitlement.Road, new TradeResources() { Sheep = 1, Brick = 1, Wood = 1, Wheat = 1 });
+                var resources = await PurchaseAll(helper, Entitlement.Settlement, new TradeResources() { Sheep = 1, Brick = 1, Wood = 1, Wheat = 1 });
 
-                Assert.Equal(helper.GameInfo.MaxRoads, resources.Entitlements.Count);
+                Assert.Equal(helper.GameInfo.MaxSettlements, resources.Settlements);
             }
 
 
