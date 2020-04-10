@@ -53,7 +53,8 @@ namespace CatanService.Controllers
             clientState = new PlayerState()
             {
                 PlayerName = playerName,
-                GameName = gameName
+                GameName = gameName,
+                ResourcesLeft = new GameInfo(game.GameInfo) 
             };
 
             game.TSSetPlayerResources( playerName, clientState);

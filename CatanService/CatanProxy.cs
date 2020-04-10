@@ -45,6 +45,69 @@ namespace Catan.Proxy
             return Post<PlayerResources>(url, CatanProxy.Serialize<GameInfo>(info));
 
         }
+
+        public Task<PlayerResources> BuyEntitlement(string gameName, string playerName, Entitlement entitlement)
+        {
+            if(String.IsNullOrEmpty(gameName) || String.IsNullOrEmpty(playerName))
+            {
+                throw new Exception("names can't be null or empty");
+            }
+            string url = $"{HostName}/api/catan/purchase/{gameName}/{playerName}/{entitlement}";
+
+            return Post<PlayerResources>(url, null);
+        }
+
+        public Task<PlayerResources> GetResources(string game, string player)
+        {
+            if (String.IsNullOrEmpty(game) || String.IsNullOrEmpty(player))
+            {
+                throw new Exception("names can't be null or empty");
+            }
+            string url = $"{HostName}/api/catan/resource/{game}/{player}";
+            return Get<PlayerResources>(url);
+        }
+
+        public Task<PlayerResources> DevCardPurchase(string game, string player)
+        {
+            if (String.IsNullOrEmpty(game) || String.IsNullOrEmpty(player))
+            {
+                throw new Exception("names can't be null or empty");
+            }
+            string url = $"{HostName}/api/catan/devcard/{game}/{player}";
+
+            return Post<PlayerResources>(url, null);
+        }
+        public Task<PlayerResources> PlayYearOfPlenty(string gameName, string player, TradeResources tr)
+        {
+
+            if (String.IsNullOrEmpty(gameName) || String.IsNullOrEmpty(player))
+            {
+                throw new Exception("names can't be null or empty");
+            }
+            string url = $"{HostName}/api/catan/devcard/play/yearofplenty/{gameName}/{player}";
+
+            return Post<PlayerResources>(url, Serialize(tr));
+        }
+        public Task<PlayerResources> PlayRoadBuilding(string game, string player)
+        {
+            if (String.IsNullOrEmpty(game) || String.IsNullOrEmpty(player))
+            {
+                throw new Exception("names can't be null or empty");
+            }
+            string url = $"{HostName}/api/catan/devcard/play/roadbuilding/{game}/{player}";
+
+            return Post<PlayerResources>(url, null);
+        }
+        public Task<PlayerResources> PlayMonopoly(string game, string player, ResourceType resourceType)
+        {
+            if (String.IsNullOrEmpty(game) || String.IsNullOrEmpty(player))
+            {
+                throw new Exception("names can't be null or empty");
+            }
+            string url = $"{HostName}/api/catan/devcard/play/monopoly/{game}/{player}/{resourceType}";
+
+            return Post<PlayerResources>(url, null);
+        }
         public Task<List<string>> GetGames()
         {
             string url = $"{HostName}/api/catan/game";
@@ -76,6 +139,9 @@ namespace Catan.Proxy
             return Get<GameInfo>(url);
 
         }
+
+       
+
         public Task<CatanResult> DeleteGame(string gameName)
         {
 
@@ -171,7 +237,15 @@ namespace Catan.Proxy
             return records;
         }
 
-        //_ = await client.PostAsync($"{_hostName}/api/catan/resource/grant/{GameName}/{player.PlayerResources.PlayerName}", new StringContent(CatanProxy.Serialize<PlayerResources>(resources), Encoding.UTF8, "application/json"));
+       
+
+        /// <summary>
+        ///     Takes resources (Ore, Wheat, etc.) from global pool and assigns to player
+        /// </summary>
+        /// <param name="game"></param>
+        /// <param name="player"></param>
+        /// <param name="resources"></param>
+        /// <returns></returns>
 
         public Task<PlayerResources> GrantResources(string game, string player, TradeResources resources)
         {
@@ -359,6 +433,8 @@ namespace Catan.Proxy
                 return default;
             }
         }
+
+
 
         public void Dispose()
         {

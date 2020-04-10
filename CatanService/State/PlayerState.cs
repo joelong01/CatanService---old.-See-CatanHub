@@ -16,7 +16,80 @@ namespace CatanService.State
         private TaskCompletionSource<object> _tcs = null;
         private ReaderWriterLockSlim TCSLock { get; } = new ReaderWriterLockSlim(); // protects access to this ResourceTracking
         private List<ServiceLogCollection> _logCollectionList = new List<ServiceLogCollection>();
+        public GameInfo ResourcesLeft { get; set; } // a game info where we will keep track of how many resources we can allocate
 
+        public bool TSFreeEntitlement(Entitlement entitlement)
+        {
+            ResourceLock.EnterWriteLock();
+            try
+            {
+                switch (entitlement)
+                {
+
+
+                    case Entitlement.Settlement:
+                        ResourcesLeft.MaxSettlements--;
+                        break;
+                    case Entitlement.City:
+                            ResourcesLeft.MaxCities++;
+                        break;
+                    case Entitlement.Road:
+                        ResourcesLeft.MaxRoads++;                            
+                        break;
+                    case Entitlement.Undefined:
+                    case Entitlement.DevCard:
+                    default:
+                        break;
+                }
+                return true;
+            }
+            finally
+            {
+                ResourceLock.ExitWriteLock();
+            }
+        }
+        public bool TSAllocateEntitlement(Entitlement entitlement)
+        {
+            ResourceLock.EnterWriteLock();
+            try
+            {
+                switch (entitlement)
+                {
+
+
+                    case Entitlement.Settlement:
+                        if (ResourcesLeft.MaxSettlements > 0)
+                        {
+                            ResourcesLeft.MaxSettlements--;
+                            return true;
+                        }
+                        break;
+                    case Entitlement.City:
+                        if (ResourcesLeft.MaxCities > 0)
+                        {
+                            ResourcesLeft.MaxCities--;
+                            return true;
+                        }
+                        break;
+                    case Entitlement.Road:
+                        if (ResourcesLeft.MaxRoads > 0)
+                        {
+                            ResourcesLeft.MaxRoads--;
+                            return true;
+                        }
+                        break;
+                    case Entitlement.Undefined:
+                    case Entitlement.DevCard:
+                    default:
+                        break;
+                }
+                return false;
+            }
+            finally
+            {
+                ResourceLock.ExitWriteLock();
+            }
+        }
         public ServiceLogCollection GetLogCollection(int startAtSequenceNumber)
         {
             ResourceLock.EnterReadLock();
@@ -43,7 +116,7 @@ namespace CatanService.State
             }
         }
 
-            public async Task<ServiceLogCollection> TSWaitForLog()
+        public async Task<ServiceLogCollection> TSWaitForLog()
         {
             Console.WriteLine($"Waiting for log for {PlayerName}");
             var logCopy = new List<object>();
@@ -71,7 +144,7 @@ namespace CatanService.State
                     SequenceNumber = _logCollectionList.Count,
                     Count = list.Count,
                     CollectionId = Guid.NewGuid()
-                   
+
                 };
                 _logCollectionList.Add(logCollection);
                 return logCollection;
@@ -256,7 +329,7 @@ namespace CatanService.State
 
 
         }
-        
+
         /// <summary>
         ///     add a log entry in a thread safe way
         /// </summary>

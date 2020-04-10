@@ -3,7 +3,8 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
 using System.Text.Json;
-
+using System;
+using System.Diagnostics.CodeAnalysis;
 
 namespace CatanSharedModels
 {
@@ -22,26 +23,53 @@ namespace CatanSharedModels
         public int MaxSettlements { get; set; } = 5;
         public int MaxResourceAllocated { get; set; } = 19; // most aggregate resource per type
         public bool AllowShips { get; set; } = false;
-        public int Knights { get; set; } = 14;
-        public int VictoryCards { get; set; } = 5;
+        public int Knight { get; set; } = 14;
+        public int VictoryPoint { get; set; } = 5;
         public int YearOfPlenty { get; set; } = 2;
         public int RoadBuilding { get; set; } = 2;
         public int Monopoly { get; set; } = 2;
+        public GameInfo() { }
+        public GameInfo(GameInfo info)
+        {
+            MaxRoads = info.MaxRoads;
+            MaxCities = info.MaxCities;
+            MaxSettlements = info.MaxSettlements;
+            MaxResourceAllocated = info.MaxResourceAllocated;
+            AllowShips = info.AllowShips;
+            Knight = info.Knight;
+            VictoryPoint = info.Knight;
+            YearOfPlenty = info.VictoryPoint;
+            RoadBuilding = info.YearOfPlenty;
+            Monopoly = info.Monopoly;
+
+        }
         public static bool operator ==(GameInfo a, GameInfo b)
         {
+            if (a is null)
+            {
+                if (b is null)
+                {
+                    return true;
+                }
+
+                return false;
+            }
+
             return
                 (
                     a.MaxRoads == b.MaxRoads &&
                     a.MaxCities == b.MaxCities &&
                     a.MaxSettlements == b.MaxSettlements &&
-                    a.Knights == b.Knights &&
+                    a.Knight == b.Knight &&
                     a.MaxResourceAllocated == b.MaxResourceAllocated &&
                     a.AllowShips == b.AllowShips &&
-                    a.VictoryCards == b.VictoryCards &&
+                    a.VictoryPoint == b.VictoryPoint &&
                     a.YearOfPlenty == b.YearOfPlenty &&
                     a.RoadBuilding == b.RoadBuilding &&
                     a.Monopoly == b.Monopoly
                 );
+
+
         }
         public static bool operator !=(GameInfo a, GameInfo b)
         {
@@ -64,7 +92,8 @@ namespace CatanSharedModels
         public string FilePath { get; set; }
         public int LineNumber { get; set; }
         public string Request { get; set; }
-        public CatanResult()
+        public CatanError Error { get; set; } = CatanError.Unknown;
+        public CatanResult() // for the Serializer
         {
 
         }
@@ -85,10 +114,20 @@ namespace CatanSharedModels
 
     }
 
-    public class DevelopmentCard
+    public class DevelopmentCard : IEquatable<DevelopmentCard>
     {
         public DevCardType DevCard { get; set; } = DevCardType.Unknown;
         public bool Played { get; set; } = false;
+
+        public bool Equals(DevelopmentCard other)
+        {
+            return (DevCard == other.DevCard && Played == other.Played);
+        }
+
+        public override string ToString()
+        {
+            return $"{DevCard} - [Played={Played}]";
+        }
     }
 
     public class TradeResources : INotifyPropertyChanged

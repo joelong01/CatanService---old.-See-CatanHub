@@ -84,7 +84,44 @@ namespace CatanService.State
     /// </summary>
     public class Game
     {
-        public GameInfo GameInfo { get; set; } = null;
+        private GameInfo _gameInfo = new GameInfo() { Knight = 0 };// this will force operator == to false w/o causing an exception
+        public GameInfo GameInfo
+        {
+            get => _gameInfo;
+            set
+            {
+                if (value != _gameInfo)
+                {
+                    _devCards.Clear();
+                    _gameInfo = value;
+                    lock (_devCardLock)
+                    {
+
+                        for (int i = 0; i < _gameInfo.Knight; i++)
+                        {
+                            _devCards.Add(DevCardType.Knight);
+                        }
+                        for (int i = 0; i < _gameInfo.VictoryPoint; i++)
+                        {
+                            _devCards.Add(DevCardType.VictoryPoint);
+                        }
+                        for (int i = 0; i < _gameInfo.YearOfPlenty; i++)
+                        {
+                            _devCards.Add(DevCardType.YearOfPlenty);
+                        }
+                        for (int i = 0; i < _gameInfo.Monopoly; i++)
+                        {
+                            _devCards.Add(DevCardType.Monopoly);
+                        }
+                        for (int i = 0; i < _gameInfo.RoadBuilding; i++)
+                        {
+                            _devCards.Add(DevCardType.RoadBuilding);
+                        }
+
+                    }
+                }
+            }
+        }
         public bool Started { get; set; } = false;
         public string Name { get; set; }
 
@@ -95,6 +132,8 @@ namespace CatanService.State
         private Dictionary<string, PlayerState> PlayerDictionary { get; } = new Dictionary<string, PlayerState>();
         private List<string> PlayerOrder { get; set; } = new List<string>();
         private int _logSequenceNumber = 0;
+
+        
 
         public string CurrentPlayer { get; private set; } = "";
 
@@ -191,9 +230,10 @@ namespace CatanService.State
 
             int total = 0;
             PlayerLock.EnterReadLock();
-
+            List<ServiceLogRecord> logList = new List<ServiceLogRecord>();
             try
             {
+
                 foreach (var kvp in PlayerDictionary)
                 {
 
@@ -225,7 +265,7 @@ namespace CatanService.State
 
                     if (total > 0)
                     {
-                        TSAddLogRecord(new MonopolyLog() { PlayerResources = kvp.Value, Action = ServiceAction.LostToMonopoly, PlayerName = kvp.Value.PlayerName, Count = total, ResourceType = resType, RequestUrl = Url });
+                        logList.Add(new MonopolyLog() { PlayerResources = kvp.Value, Action = ServiceAction.LostToMonopoly, PlayerName = kvp.Value.PlayerName, Count = total, ResourceType = resType, RequestUrl = Url });
                     }
 
                 }
@@ -234,6 +274,12 @@ namespace CatanService.State
             finally
             {
                 PlayerLock.ExitReadLock();
+                //
+                //  can't do this under the Read lock!
+                foreach (var o in logList)
+                {
+                    TSAddLogRecord(o);
+                }
             }
         }
 
