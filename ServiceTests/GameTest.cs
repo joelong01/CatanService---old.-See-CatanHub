@@ -35,7 +35,7 @@ namespace ServiceTests
                 games = await helper.Proxy.GetGames();
 
 
-                GameLog gameLog = await helper.GetLastLogRecord<GameLog>();
+                GameLog gameLog = await helper.GetLogRecordsFromEnd<GameLog>();
                 Assert.Equal(ServiceAction.PlayerAdded, gameLog.Action);
                 Assert.Equal(ServiceLogType.Game, gameLog.LogType);
                 Assert.NotEmpty(gameLog.Players);

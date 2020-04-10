@@ -79,11 +79,9 @@ namespace ServiceTests
                     //  make sure we got what we asked for
                     Assert.True(resource.EquivalentResourceCount(loopTempResourceAsk + startingResource));
 
-
-
                     //
                     //  get the log record - it should have resources we just granted
-                    var lastLogRecord = await helper.GetLastLogRecord<ResourceLog>();
+                    var lastLogRecord = await helper.GetLogRecordsFromEnd<ResourceLog>();
                     Assert.True(lastLogRecord.PlayerResources.Equivalent(resource));
                     Assert.True(lastLogRecord.TradeResource.Equivalent(loopTempResourceAsk));
 
@@ -93,7 +91,7 @@ namespace ServiceTests
 
                     //
                     //  get the log for the Undo Action
-                    lastLogRecord = await helper.GetLastLogRecord<ResourceLog>();
+                    lastLogRecord = await helper.GetLogRecordsFromEnd<ResourceLog>();
                     Assert.Equal(ServiceAction.GrantResources, lastLogRecord.Action);
                     Assert.True(lastLogRecord.PlayerResources.Equivalent(resourcesAfterUndo));
                     Assert.Equal(players[0], lastLogRecord.PlayerName);

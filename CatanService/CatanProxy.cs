@@ -28,6 +28,31 @@ namespace Catan.Proxy
         private CancellationTokenSource _cts = new CancellationTokenSource(TimeSpan.FromDays(1));
         public string HostName { get; set; } // "http://localhost:50919";
         public CatanResult LastError { get; set; } = null;
+
+        public Task<PlayerResources> RefundEntitlement(string gameName, PurchaseLog log)
+        {
+            if (String.IsNullOrEmpty(gameName))
+            {
+                throw new Exception("names can't be null or empty");
+            }
+            if (log is null)
+            {
+                throw new Exception("Purchase Log cannot be null in RefundEntitlment");
+            }
+            string url = $"{HostName}/api/catan/purchase/refund/{gameName}";
+
+            return Post<PlayerResources>(url, Serialize<PurchaseLog>(log));
+        }
+        public Task<PlayerResources> BuyEntitlement(string gameName, string playerName, Entitlement entitlement)
+        {
+            if (String.IsNullOrEmpty(gameName) || String.IsNullOrEmpty(playerName))
+            {
+                throw new Exception("names can't be null or empty");
+            }
+            string url = $"{HostName}/api/catan/purchase/{gameName}/{playerName}/{entitlement}";
+
+            return Post<PlayerResources>(url, null);
+        }
         public string LastErrorString { get; set; } = "";
         public CatanProxy()
         {
@@ -47,16 +72,7 @@ namespace Catan.Proxy
 
         }
 
-        public Task<PlayerResources> BuyEntitlement(string gameName, string playerName, Entitlement entitlement)
-        {
-            if (String.IsNullOrEmpty(gameName) || String.IsNullOrEmpty(playerName))
-            {
-                throw new Exception("names can't be null or empty");
-            }
-            string url = $"{HostName}/api/catan/purchase/{gameName}/{playerName}/{entitlement}";
-
-            return Post<PlayerResources>(url, null);
-        }
+       
 
         public Task<PlayerResources> GetResources(string game, string player)
         {
@@ -201,7 +217,8 @@ namespace Catan.Proxy
                     case ServiceAction.Undefined:
                         break;
                     case ServiceAction.Purchased:
-
+                        PurchaseLog purchaseLog = CatanProxy.Deserialize<PurchaseLog>(rec.ToString());
+                        records.Add(purchaseLog);
                         break;
                     case ServiceAction.PlayerAdded:
                         GameLog gameLog = CatanProxy.Deserialize<GameLog>(rec.ToString());

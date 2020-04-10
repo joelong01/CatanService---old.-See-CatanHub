@@ -22,10 +22,13 @@ namespace ServiceTests
                 var resources = await PurchaseAll(helper, Entitlement.Road, new TradeResources() { Brick = 1, Wood = 1 });
 
                 Assert.Equal(helper.GameInfo.MaxRoads, resources.Roads);
+
+
             }
 
 
         }
+        [Fact]
         private async Task PurchaseCities()
         {
             TestHelper helper = new TestHelper();
@@ -38,7 +41,7 @@ namespace ServiceTests
 
 
         }
-
+        [Fact]
         private async Task PurchaseSettlements()
         {
             TestHelper helper = new TestHelper();
@@ -72,6 +75,16 @@ namespace ServiceTests
             Assert.Equal(CatanError.LimitExceeded, helper.Proxy.LastError.Error);
             resources = await helper.Proxy.GetResources(helper.GameName, player);
             Assert.NotNull(resources);
+
+
+            var resourceLog = await helper.GetLogRecordsFromEnd<ResourceLog>();
+            Assert.True(resourceLog.PlayerResources.EquivalentResourceCount(tr));
+
+            var purchaseLog = await helper.GetLogRecordsFromEnd<PurchaseLog>(2);
+            var refundResources = await helper.Proxy.RefundEntitlement(helper.GameName, purchaseLog);
+            Assert.NotNull(refundResources);
+            
+
             return resources;
 
         }

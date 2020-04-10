@@ -66,7 +66,7 @@ namespace ServiceTests
 
             Debug.WriteLine("Exiting Timer thread");
         }
-        public async Task<T> GetLastLogRecord<T>()
+        public async Task<T> GetLogRecordsFromEnd<T>(int offset = 1 )
         {
             List<ServiceLogRecord> logCollection = await Proxy.GetAllLogs(GameName, Players[0], 0);
             if (logCollection == null)
@@ -76,7 +76,7 @@ namespace ServiceTests
             Assert.NotNull(logCollection);
             Assert.NotEmpty(logCollection);
             
-            T ret =  (T)(object)logCollection[^1];
+            T ret =  (T)(object)logCollection[^offset];
             Assert.NotNull(ret);
             return ret;
 
