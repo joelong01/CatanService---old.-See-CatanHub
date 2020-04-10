@@ -90,29 +90,28 @@ namespace CatanService.State
                 ResourceLock.ExitWriteLock();
             }
         }
-        public ServiceLogCollection GetLogCollection(int startAtSequenceNumber)
+        public List<ServiceLogCollection> GetLogCollection(int startAtSequenceNumber)
         {
-            ResourceLock.EnterReadLock();
+           // ResourceLock.EnterReadLock();
             try
             {
-                var list = new List<object>();
+                var list = new List<ServiceLogCollection>();
+                
                 for (int i = startAtSequenceNumber; i < _logCollectionList.Count; i++)
                 {
                     list.Add(_logCollectionList[i]);
                 }
-                ServiceLogCollection logCollection = new ServiceLogCollection()
+                ServiceLogCollection lc = GetLatestLogCollection();
+                if (lc != null)
                 {
-                    LogRecords = list,
-                    SequenceNumber = _logCollectionList.Count,
-                    Count = list.Count,
-                    CollectionId = Guid.NewGuid()
+                    list.Add(lc);
+                }
 
-                };
-                return logCollection;
+                return list;
             }
             finally
             {
-                ResourceLock.ExitReadLock();
+              //  ResourceLock.ExitReadLock();
             }
         }
 
@@ -138,6 +137,25 @@ namespace CatanService.State
 
                 _tcs = null;
                 var list = TSGetLogEntries();
+                ServiceLogCollection logCollection = GetLatestLogCollection();
+                _logCollectionList.Add(logCollection);
+                return logCollection;
+            }
+            finally
+            {
+                Debug.WriteLine($"returning log for {PlayerName} Count={logCopy.Count} ");
+            }
+
+        }
+
+        private ServiceLogCollection GetLatestLogCollection()
+        {
+            
+            var logCopy = new List<object>();
+            try
+            {               
+                var list = TSGetLogEntries();
+                if (list.Count == 0) return null;
                 ServiceLogCollection logCollection = new ServiceLogCollection()
                 {
                     LogRecords = list,
@@ -145,8 +163,7 @@ namespace CatanService.State
                     Count = list.Count,
                     CollectionId = Guid.NewGuid()
 
-                };
-                _logCollectionList.Add(logCollection);
+                };               
                 return logCollection;
             }
             finally

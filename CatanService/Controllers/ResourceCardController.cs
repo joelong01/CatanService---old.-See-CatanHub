@@ -78,6 +78,45 @@ namespace CatanService.Controllers
 
 
         }
+
+
+        [HttpPost("return/{gameName}/{playerName}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public IActionResult ReturnResources([FromBody] TradeResources toAdd, string gameName, string playerName)
+        {
+            var game = TSGlobal.GetGame(gameName);
+            if (game == null)
+            {
+                return NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+            }
+            var resources = game.GetPlayer(playerName);
+            if (resources == null)
+            {
+                return NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" });
+
+            }
+            if (toAdd.Wheat < 0 ||
+                  toAdd.Sheep < 0 ||
+                  toAdd.Ore < 0 ||
+                  toAdd.Brick < 0 ||
+                  toAdd.Wood < 0)
+            {
+                return BadRequest(new CatanResultWithBody<TradeResources>(toAdd) { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' is trying to return a negative resource" });
+            }
+            
+
+            resources.TSAdd(toAdd);
+
+
+            game.TSAddLogRecord(new ResourceLog() { PlayerResources = resources, Action = ServiceAction.ReturnResources, PlayerName = playerName, TradeResource = toAdd, RequestUrl = this.Request.Path });
+            game.TSReleaseMonitors();
+            return Ok(resources);
+
+
+
+        }
         /// <summary>
         ///     A user trades some of their gold for resources.  this could be a trade with a proper URL set up
         ///     Chose to make this an API as the business logic is cleaner and I don't have to get 2 references

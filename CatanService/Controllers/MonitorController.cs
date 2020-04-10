@@ -45,6 +45,35 @@ namespace CatanService.Controllers
             return Ok(logCollection);
 
         }
+        [HttpGet("logs/{gameName}/{playerName}/{startAt}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public IActionResult GetAllLogs(string gameName, string playerName, int startAt)
+        {
+            var game = TSGlobal.GetGame(gameName);
+            if (game == null)
+            {
+                return NotFound(new CatanResult() { Error=CatanError.NoGameWithThatName, Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+            }
+            
+            var clientState = game.GetPlayer(playerName);
+
+            if (clientState == null)
+            {
+
+                return NotFound(new CatanResult() {Error = CatanError.NoPlayerWithThatName, Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" });
+
+            }
+            
+            
+            return Ok(clientState.GetLogCollection(startAt));
+
+        }
+
+
+
+
 
     }
 }

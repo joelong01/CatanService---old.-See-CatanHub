@@ -11,11 +11,11 @@ using Xunit;
 namespace ServiceTests
 {
 
-    public class CatanTest : IClassFixture<ServiceFixture>
+    public class GameTest : IClassFixture<ServiceFixture>
     {
         private readonly ServiceFixture _fixture;
 
-        public CatanTest(ServiceFixture fixture)
+        public GameTest(ServiceFixture fixture)
         {
             _fixture = fixture;
         }
@@ -32,6 +32,25 @@ namespace ServiceTests
                 var games = await helper.Proxy.GetGames();
                 bool contains = games.Contains(helper.GameName.ToLower());
                 Assert.True(contains);
+                games = await helper.Proxy.GetGames();
+                List<List<ServiceLogRecord>> logCollection = await helper.Proxy.GetAllLogs(helper.GameName, helper.Players[0], 0);
+                Assert.NotNull(logCollection);
+                Assert.NotEmpty(logCollection);
+                Assert.NotEmpty(logCollection[0]);
+                GameLog gameLog = logCollection[0][0] as GameLog;
+                Assert.Equal(ServiceAction.PlayerAdded, gameLog.Action);
+                Assert.Equal(ServiceLogType.Game, gameLog.LogType);
+                Assert.NotEmpty(gameLog.Players);
+                List<string> allPlayers = new List<string>(helper.Players);
+                foreach (var player in gameLog.Players )
+                {
+                    Assert.Contains(player, allPlayers);
+                    allPlayers.Remove(player);
+                }
+
+                Assert.Empty(allPlayers);
+                
+                
             }                      
         }
 

@@ -4,7 +4,8 @@ using CatanSharedModels;
 using Microsoft.AspNetCore.Mvc.Testing;
 using System;
 using System.Collections.Generic;
-using System.Text;
+using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -16,6 +17,7 @@ namespace ServiceTests
         public string GameName { get; }
         public GameInfo GameInfo { get; set; } = new GameInfo();
         public List<string> Players { get; set; }
+        public List<List<ServiceLogRecord>> LogCollection { get; } = new List<List<ServiceLogRecord>>();
         public TestHelper()
         {
             GameName = Guid.NewGuid().ToString();
@@ -26,15 +28,43 @@ namespace ServiceTests
                 AllowAutoRedirect = false
             });
         }
+        Timer _timer = null;
         public async Task<List<string>> CreateGame()
         {
             var gameInfo = new GameInfo();
-            _ = await Proxy.Register(gameInfo, GameName, "Doug");
-            _ = await Proxy.Register(gameInfo, GameName, "Max");
-            _ = await Proxy.Register(gameInfo, GameName, "Wallace");
-            _ = await Proxy.Register(gameInfo, GameName, "Joe");
+            var response = await Proxy.Register(gameInfo, GameName, "Doug");
+            Assert.NotNull(response);
+            response = await Proxy.Register(gameInfo, GameName, "Max");
+            Assert.NotNull(response);
+            response = await Proxy.Register(gameInfo, GameName, "Wallace");
+            Assert.NotNull(response);
+            response = await Proxy.Register(gameInfo, GameName, "Joe");
+            Assert.NotNull(response);
+            await Proxy.StartGame(GameName);
+
             Players = await Proxy.GetUsers(GameName);
+            Assert.Equal(4, Players.Count);
+          //  _timer = new Timer(OnTimerCallback, _timer, 0, 0);
+            
             return Players;
+        }
+
+        private async void OnTimerCallback(object state)
+        {
+            _timer.Change(-1, -1);
+            List<ServiceLogRecord> logs;
+            do
+            {
+                logs = await Proxy.Monitor(this.GameName, Players[0]);
+                if (logs != null)
+                {
+                    LogCollection.Add(logs);
+                    break;
+                }
+                
+            } while (logs != null);
+
+            Debug.WriteLine("Exiting Timer thread");
         }
 
 

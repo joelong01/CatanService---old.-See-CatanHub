@@ -13,8 +13,6 @@ namespace ServiceTests
 {
     public class PurchaseTests : IClassFixture<ServiceFixture>
     {
-        private readonly ServiceFixture _fixture;
-
         [Fact]
         private async Task PurchaseRoads()
         {

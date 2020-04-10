@@ -13,7 +13,7 @@ namespace CatanSharedModels
 
     public enum Entitlement { Undefined, DevCard, Settlement, City, Road }
 
-    public enum ResourceType { Sheep, Wood, Ore, Wheat, Brick, Desert, Back, None, Sea, GoldMine, VictoryPoint, Knight, YearOfPlenty, RoadBuilding, Monopoly };
+    public enum ResourceType { Sheep, Wood, Ore, Wheat, Brick, GoldMine, Desert, Back, None, Sea };
     public enum DevCardType { Knight, VictoryPoint, YearOfPlenty, RoadBuilding, Monopoly, Unknown };
 
     public class GameInfo
@@ -281,6 +281,32 @@ namespace CatanSharedModels
         public int TotalResources => Wheat + Wood + Brick + Ore + Sheep + GoldMine;
 
         public PlayerResources() { }
+
+        public int GetResourceCount(ResourceType rt)
+        {
+            switch (rt)
+            {
+                case ResourceType.Sheep:
+                    return this.Sheep;
+                case ResourceType.Wood:
+                    return this.Wheat;
+                case ResourceType.Ore:
+                    return this.Ore;
+                case ResourceType.Wheat:
+                    return Wheat;
+                case ResourceType.Brick:
+                    return Brick;
+                case ResourceType.GoldMine:
+                    return GoldMine;
+                case ResourceType.Desert:
+                case ResourceType.Back:
+                case ResourceType.None:
+                case ResourceType.Sea:
+                default:
+                    break;
+            }
+            return 0;
+        }
 
     }
 }

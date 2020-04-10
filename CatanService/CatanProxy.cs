@@ -33,6 +33,7 @@ namespace Catan.Proxy
         {
             Client.Timeout = TimeSpan.FromHours(5);
         }
+        
         public Task<PlayerResources> Register(GameInfo info, string gameName, string playerName)
         {
 
@@ -65,6 +66,11 @@ namespace Catan.Proxy
             }
             string url = $"{HostName}/api/catan/resource/{game}/{player}";
             return Get<PlayerResources>(url);
+        }
+
+        public Task<PlayerResources> ReturnResource(string gameName, string v, TradeResources tr)
+        {
+            throw new NotImplementedException();
         }
 
         public Task<PlayerResources> DevCardPurchase(string game, string player)
@@ -176,6 +182,13 @@ namespace Catan.Proxy
             string json = await Get<string>(url);
 
             ServiceLogCollection serviceLogCollection = CatanProxy.Deserialize<ServiceLogCollection>(json);
+            List<ServiceLogRecord> records = ParseServiceLogRecord(serviceLogCollection);
+            //Debug.WriteLine($"[Game={game}] [Player={player}] [LogCount={logList.Count}]");
+            return records;
+        }
+
+        private List<ServiceLogRecord>  ParseServiceLogRecord(ServiceLogCollection serviceLogCollection)
+        {
             List<ServiceLogRecord> records = new List<ServiceLogRecord>();
             foreach (var rec in serviceLogCollection.LogRecords)
             {
@@ -229,15 +242,31 @@ namespace Catan.Proxy
                     default:
                         break;
                 }
-
-
-
             }
-            //Debug.WriteLine($"[Game={game}] [Player={player}] [LogCount={logList.Count}]");
             return records;
         }
 
-       
+        public async Task<List<List<ServiceLogRecord>>> GetAllLogs(string game, string player, int startAt)
+        {
+            if (String.IsNullOrEmpty(game))
+            {
+                throw new Exception("names can't be null or empty");
+            }
+            string url = $"{HostName}/api/catan/monitor/logs/{game}/{player}/{startAt}";
+            string json = await Get<string>(url);
+            if (String.IsNullOrEmpty(json)) return null;
+
+            List<ServiceLogCollection> response = CatanProxy.Deserialize<List<ServiceLogCollection>>(json);
+
+            List<List<ServiceLogRecord>> ret = new List<List<ServiceLogRecord>>();
+            foreach (ServiceLogCollection logCollection in response)
+            {
+                List<ServiceLogRecord> records = ParseServiceLogRecord(logCollection);
+                ret.Add(records);
+            }
+
+            return ret;
+        }
 
         /// <summary>
         ///     Takes resources (Ore, Wheat, etc.) from global pool and assigns to player
@@ -438,6 +467,7 @@ namespace Catan.Proxy
 
         public void Dispose()
         {
+            _cts.Cancel();
             Client.Dispose();
         }
         public static JsonSerializerOptions GetJsonOptions(bool indented = false)

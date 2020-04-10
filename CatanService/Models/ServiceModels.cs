@@ -35,7 +35,8 @@ namespace CatanSharedModels
         PlayedMonopoly,
         PlayedRoadBuilding,
         PlayedKnight,
-        PlayedYearOfPlenty
+        PlayedYearOfPlenty,
+        ReturnResources
     }
     /// <summary>
     ///     returned by Monitor.  
