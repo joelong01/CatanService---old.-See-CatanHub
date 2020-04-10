@@ -1,5 +1,6 @@
 ﻿using CatanService.State;
 using CatanSharedModels;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
@@ -40,6 +41,20 @@ namespace CatanService
     {
         public static Games Games { get; } = new Games();
         public static Game GetGame(string gameName) { return Games.TSGetGame(gameName); }
+
+        public static (Game, PlayerResources) GetGameAndPlayerInfo(string gameName, string playerName)
+        {
+            Game game = TSGlobal.GetGame(gameName);
+            PlayerResources resources = null;
+            if (game != null)
+            {
+                resources = game.GetPlayer(playerName);
+            }
+
+            return (game, resources);
+
+        }
+
     }
 
 

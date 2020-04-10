@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -25,8 +26,13 @@ namespace ServiceTests
             using (helper)
             {
                 var players = await helper.CreateGame();
+
+                
                 foreach (ResourceType restype in Enum.GetValues(typeof(ResourceType)))
                 {
+                    // 
+                    // grant each resource ...
+                    ResourceType grantedResource = restype;
                     var tr = new TradeResources() { };
                     switch (restype)
                     {
@@ -56,10 +62,32 @@ namespace ServiceTests
                             continue;
                     }
 
+                    
+
                     var resource = await helper.Proxy.GrantResources(helper.GameName, players[0], tr);
                     Assert.NotNull(resource);
-                    Assert.Equal(1, resource.GetResourceCount(restype));
+                    //
+                    //  should have one of these...
+                    
+                    Assert.Equal(1, resource.GetResourceCount(grantedResource));
+                    //
+                    //  make sure all the others are zero.  
+                    foreach (ResourceType rt in Enum.GetValues(typeof(ResourceType)))
+                    {
+                        if (rt == grantedResource) continue;                       
+                        Assert.Equal(0, resource.GetResourceCount(rt));                        
+                    }
+                    //
+                    //  return the resource
                     resource = await helper.Proxy.ReturnResource(helper.GameName, players[0], tr);
+                    Assert.NotNull(resource);
+                    //
+                    //  all resources should be zero
+                    foreach (ResourceType rt in Enum.GetValues(typeof(ResourceType)))
+                    {
+                        Debug.WriteLine($"{rt}={resource.GetResourceCount(rt)}");
+                        Assert.Equal(0, resource.GetResourceCount(rt));
+                    }
                 }
             }
         }

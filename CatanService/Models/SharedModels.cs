@@ -257,11 +257,12 @@ namespace CatanSharedModels
                 Ore = -Ore,
                 Sheep = -Sheep,
                 Brick = -Brick,
+                GoldMine = -GoldMine
             };
         }
 
         [JsonIgnore]
-        public int Total => Wheat + Wood + Brick + Ore + Sheep;
+        public int Total => Wheat + Wood + Brick + Ore + Sheep + GoldMine;
     }
 
     public class PlayerResources
@@ -287,11 +288,11 @@ namespace CatanSharedModels
             switch (rt)
             {
                 case ResourceType.Sheep:
-                    return this.Sheep;
+                    return Sheep;
                 case ResourceType.Wood:
-                    return this.Wheat;
+                    return Wood;
                 case ResourceType.Ore:
-                    return this.Ore;
+                    return Ore;
                 case ResourceType.Wheat:
                     return Wheat;
                 case ResourceType.Brick:

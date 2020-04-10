@@ -47,31 +47,12 @@ namespace CatanService.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public IActionResult GrantResources([FromBody] TradeResources toAdd, string gameName, string playerName)
         {
-            var game = TSGlobal.GetGame(gameName);
-            if (game == null)
+            (Game game, PlayerResources resources, IActionResult iaResult) = InternalPurchase(toAdd, gameName, playerName, true);
+            if (iaResult != null)
             {
-                return NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+                return iaResult;
             }
-            var resources = game.GetPlayer(playerName);
-            if (resources == null)
-            {
-                return NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" });
-
-            }
-            if (toAdd.Wheat < 0 ||
-                  toAdd.Sheep < 0 ||
-                  toAdd.Ore < 0 ||
-                  toAdd.Brick < 0 ||
-                  toAdd.Wood < 0)
-            {
-                return BadRequest(new CatanResultWithBody<TradeResources>(toAdd) { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' is trying to grant a negative resource" });
-            }
-
-
-            resources.TSAdd(toAdd);
-
-
-            game.TSAddLogRecord( new ResourceLog() { PlayerResources = resources, Action = ServiceAction.GrantResources, PlayerName = playerName, TradeResource = toAdd, RequestUrl = this.Request.Path });
+            game.TSAddLogRecord(new ResourceLog() { PlayerResources = resources, Action = ServiceAction.GrantResources, PlayerName = playerName, TradeResource = toAdd, RequestUrl = this.Request.Path });
             game.TSReleaseMonitors();
             return Ok(resources);
 
@@ -79,6 +60,45 @@ namespace CatanService.Controllers
 
         }
 
+        private (Game, PlayerResources, IActionResult) InternalPurchase(TradeResources toAdd, string gameName, string playerName, bool add)
+        {
+            var game = TSGlobal.GetGame(gameName);
+            if (game == null)
+            {
+                return (game, null, NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path }));
+            }
+            var resources = game.GetPlayer(playerName);
+            if (resources == null)
+            {
+                return (game, null, NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" }));
+
+            }
+            if (toAdd.Wheat < 0 ||
+                  toAdd.Sheep < 0 ||
+                  toAdd.Ore < 0 ||
+                  toAdd.Brick < 0 ||
+                  toAdd.Wood < 0 ||
+                  toAdd.GoldMine < 0)
+            {
+                return (game, null, BadRequest(new CatanResultWithBody<TradeResources>(toAdd)
+                {
+                    Request = this.Request.Path,
+                    Description = $"{playerName} in game '{gameName}' is trying to {(add ? "grant" : "refund")} a negative resource"
+                }));
+            }
+
+            if (add)
+            {
+                resources.TSAdd(toAdd);
+            }
+            else
+            {
+                resources.TSAdd(toAdd.GetNegated());
+            }
+
+
+            return (game, resources, null);
+        }
 
         [HttpPost("return/{gameName}/{playerName}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
@@ -86,31 +106,22 @@ namespace CatanService.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public IActionResult ReturnResources([FromBody] TradeResources toAdd, string gameName, string playerName)
         {
-            var game = TSGlobal.GetGame(gameName);
-            if (game == null)
+            (Game game, PlayerResources resources, IActionResult iaResult) = InternalPurchase(toAdd, gameName, playerName, false);
+            if (iaResult != null)
             {
-                return NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+                return iaResult;
             }
-            var resources = game.GetPlayer(playerName);
-            if (resources == null)
+
+
+            game.TSAddLogRecord(new ResourceLog()
             {
-                return NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" });
+                PlayerResources = resources,
+                Action = ServiceAction.ReturnResources,
+                PlayerName = playerName,
+                TradeResource = toAdd,
+                RequestUrl = this.Request.Path
+            });
 
-            }
-            if (toAdd.Wheat < 0 ||
-                  toAdd.Sheep < 0 ||
-                  toAdd.Ore < 0 ||
-                  toAdd.Brick < 0 ||
-                  toAdd.Wood < 0)
-            {
-                return BadRequest(new CatanResultWithBody<TradeResources>(toAdd) { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' is trying to return a negative resource" });
-            }
-            
-
-            resources.TSAdd(toAdd);
-
-
-            game.TSAddLogRecord(new ResourceLog() { PlayerResources = resources, Action = ServiceAction.ReturnResources, PlayerName = playerName, TradeResource = toAdd, RequestUrl = this.Request.Path });
             game.TSReleaseMonitors();
             return Ok(resources);
 
@@ -160,7 +171,7 @@ namespace CatanService.Controllers
             // now lock it so that you change it in a thread safe way
             trade.GoldMine = -trade.GoldMine;
             resources.TSAdd(trade);
-            game.TSAddLogRecord( new ResourceLog() { PlayerResources = resources, Action = ServiceAction.TradeGold, PlayerName = playerName, TradeResource = trade, RequestUrl = this.Request.Path });
+            game.TSAddLogRecord(new ResourceLog() { PlayerResources = resources, Action = ServiceAction.TradeGold, PlayerName = playerName, TradeResource = trade, RequestUrl = this.Request.Path });
             game.TSReleaseMonitors();
             return Ok(resources);
         }
@@ -251,7 +262,7 @@ namespace CatanService.Controllers
             fromResources.TSAdd(toTrade);
             toResources.TSAdd(toTrade.GetNegated());
 
-            game.TSAddLogRecord( new TradeLog() { PlayerName = fromName, FromName = fromName, ToName = toName, FromTrade = fromTrade, ToTrade = toTrade, FromResources = fromResources, ToResources = toResources, RequestUrl = this.Request.Path });
+            game.TSAddLogRecord(new TradeLog() { PlayerName = fromName, FromName = fromName, ToName = toName, FromTrade = fromTrade, ToTrade = toTrade, FromResources = fromResources, ToResources = toResources, RequestUrl = this.Request.Path });
             game.TSReleaseMonitors();
             return Ok(new PlayerResources[2] { fromResources, toResources });
         }
@@ -367,7 +378,7 @@ namespace CatanService.Controllers
             finally
             {
                 // log it
-                game.TSAddLogRecord( new TakeLog() { PlayerName = fromName, FromName = fromName, ToName = toName, Taken = takenResource, FromResources = fromResources, ToResources = toResources, Action = ServiceAction.TakeCard, RequestUrl = this.Request.Path });
+                game.TSAddLogRecord(new TakeLog() { PlayerName = fromName, FromName = fromName, ToName = toName, Taken = takenResource, FromResources = fromResources, ToResources = toResources, Action = ServiceAction.TakeCard, RequestUrl = this.Request.Path });
                 game.TSReleaseMonitors();
             }
 
@@ -400,7 +411,7 @@ namespace CatanService.Controllers
 
             playerResources.TSAddResource(resourceType, -cost);
             playerResources.TSAddResource(resourceType, 1);
-            game.TSAddLogRecord( new MeritimeTradeLog() { Cost = cost, PlayerName = playerName, Traded = resourceType, RequestUrl = this.Request.Path });
+            game.TSAddLogRecord(new MeritimeTradeLog() { Cost = cost, PlayerName = playerName, Traded = resourceType, RequestUrl = this.Request.Path });
             game.TSReleaseMonitors();
             return Ok(playerResources);
         }

@@ -127,7 +127,7 @@ namespace CatanService.Controllers
         /// <param name="playerName"></param>
         /// <param name="entitlement"></param>
         /// <returns></returns>
-        [HttpPost("refund/{gameName}/{playerName}/{entitlement}")]
+        [HttpPost("return/{gameName}/{playerName}/{entitlement}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]

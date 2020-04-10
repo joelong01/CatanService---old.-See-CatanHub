@@ -68,10 +68,7 @@ namespace Catan.Proxy
             return Get<PlayerResources>(url);
         }
 
-        public Task<PlayerResources> ReturnResource(string gameName, string v, TradeResources tr)
-        {
-            throw new NotImplementedException();
-        }
+       
 
         public Task<PlayerResources> DevCardPurchase(string game, string player)
         {
@@ -286,7 +283,16 @@ namespace Catan.Proxy
             var body = CatanProxy.Serialize<TradeResources>(resources);
             return Post<PlayerResources>(url, body);
         }
-
+        public Task<PlayerResources> ReturnResource(string game, string player, TradeResources resources)
+        {
+            if (String.IsNullOrEmpty(game) || String.IsNullOrEmpty(player))
+            {
+                throw new Exception("names can't be null or empty");
+            }
+            string url = $"{HostName}/api/catan/resource/return/{game}/{player}";
+            var body = CatanProxy.Serialize<TradeResources>(resources);
+            return Post<PlayerResources>(url, body);
+        }
         public Task<List<PlayerResources>> Trade(string game, string fromPlayer, TradeResources from, string toPlayer, TradeResources to)
         {
             if (String.IsNullOrEmpty(fromPlayer) || String.IsNullOrEmpty(toPlayer) || String.IsNullOrEmpty(game))

@@ -76,12 +76,10 @@ namespace ServiceTests
             using (helper)
             {
                 var users = await helper.CreateGame();
-                //
-                //  remember everything is in lower case
-                Assert.Contains("max", users);
-                Assert.Contains("wallace", users);
-                Assert.Contains("joe", users);
-                
+                foreach (var player in helper.Players)
+                {
+                    Assert.Contains(player.ToLower(), users);
+                }                               
             }
         }
 
