@@ -14,8 +14,11 @@ namespace CatanSharedModels
         UpdateTurn,
         Monopoly
     }
-    public enum CatanError { DevCardsSoldOut, NoMoreResource, LimitExceeded,
-        Unknown,
+    public enum CatanError
+    {
+        DevCardsSoldOut,
+        NoMoreResource,
+        LimitExceeded,
         NoGameWithThatName,
         NoPlayerWithThatName,
         NotEnoughResourcesToPurchase,
@@ -24,7 +27,10 @@ namespace CatanSharedModels
         NoResource,
         BadEntitlement,
         BadParameter,
-        BadLogRecord
+        BadLogRecord,
+        PlayerAlreadyRegistered,
+        GameAlreadStarted,
+        Unknown,
     }
     /// <summary>
     ///     this enum tells us what the data was used for. We often have data shapes for only one reason...
@@ -38,7 +44,8 @@ namespace CatanSharedModels
         PlayedRoadBuilding,
         PlayedKnight,
         PlayedYearOfPlenty,
-        ReturnResources
+        ReturnResources,
+        GameStarted
     }
     /// <summary>
     ///     returned by Monitor.  
@@ -51,7 +58,6 @@ namespace CatanSharedModels
     /// </summary>
     public class ServiceLogCollection
     {
-        public int SequenceNumber { get; set; }
         public int Count { get; set; }
         public List<object> LogRecords { get; set; }
         public Guid CollectionId { get; set; }
@@ -131,7 +137,7 @@ namespace CatanSharedModels
     }
     public class GameLog : ServiceLogRecord
     {
-        public IEnumerable<string> Players { get; set; }
+        public ICollection<string> Players { get; set; }
         public GameLog() { LogType = ServiceLogType.Game; }
     }
 }

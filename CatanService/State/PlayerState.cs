@@ -9,16 +9,15 @@ namespace CatanService.State
 {
     public class PlayerState : PlayerResources
     {
-       
+
         //
         //  a lock to protect the resources
         private ReaderWriterLockSlim ResourceLock { get; } = new ReaderWriterLockSlim(); // protects access to this ResourceTracking
         private List<object> _log = new List<object>(); // this one gets wiped every time TSWaitForLog returns
         private List<object> _permLog = new List<object>(); // this one has *everything*
-        private List<ServiceLogCollection> _logCollectionList = new List<ServiceLogCollection>();
         private TaskCompletionSource<object> _tcs = null;
         private ReaderWriterLockSlim TCSLock { get; } = new ReaderWriterLockSlim(); // protects access to this ResourceTracking
-        
+
         public GameInfo ResourcesLeft { get; set; } // a game info where we will keep track of how many resources we can allocate
 
         public bool TSFreeEntitlement(Entitlement entitlement)
@@ -34,10 +33,10 @@ namespace CatanService.State
                         ResourcesLeft.MaxSettlements--;
                         break;
                     case Entitlement.City:
-                            ResourcesLeft.MaxCities++;
+                        ResourcesLeft.MaxCities++;
                         break;
                     case Entitlement.Road:
-                        ResourcesLeft.MaxRoads++;                            
+                        ResourcesLeft.MaxRoads++;
                         break;
                     case Entitlement.Undefined:
                     case Entitlement.DevCard:
@@ -100,7 +99,7 @@ namespace CatanService.State
             {
 
                 var list = new List<object>();
-                for (int i=startAtSequenceNumber; i<_permLog.Count -1; i++)
+                for (int i = startAtSequenceNumber; i < _permLog.Count - 1; i++)
                 {
                     list.Add(_permLog[i]);
                 }
@@ -108,7 +107,6 @@ namespace CatanService.State
                 return new ServiceLogCollection()
                 {
                     LogRecords = new List<object>(_permLog),
-                    SequenceNumber = _permLog.Count,
                     Count = _permLog.Count - startAtSequenceNumber,
                     CollectionId = Guid.NewGuid()
                 };
@@ -122,7 +120,7 @@ namespace CatanService.State
         public async Task<ServiceLogCollection> TSWaitForLog()
         {
             Console.WriteLine($"Waiting for log for {PlayerName}");
-            var logCopy = new List<object>();
+            ServiceLogCollection logCollection = null;
             try
             {
 
@@ -141,39 +139,21 @@ namespace CatanService.State
 
                 _tcs = null;
                 var list = TSGetLogEntries();
-                ServiceLogCollection logCollection = GetLatestLogCollection();
-                _logCollectionList.Add(logCollection);
-                return logCollection;
-               
-            }
-            finally
-            {
-                Debug.WriteLine($"returning log for {PlayerName} Count={logCopy.Count} ");
-            }
-
-        }
-
-        private ServiceLogCollection GetLatestLogCollection()
-        {
-            
-            var logCopy = new List<object>();
-            try
-            {               
-                var list = TSGetLogEntries();
-                if (list.Count == 0) return null;
-                ServiceLogCollection logCollection = new ServiceLogCollection()
+                logCollection = new ServiceLogCollection()
                 {
                     LogRecords = list,
-                    SequenceNumber = _logCollectionList.Count,
                     Count = list.Count,
                     CollectionId = Guid.NewGuid()
 
-                };               
+                };
+
+
                 return logCollection;
+
             }
             finally
             {
-                Debug.WriteLine($"returning log for {PlayerName} Count={logCopy.Count} ");
+                Debug.WriteLine($"returning log for {PlayerName} returning {logCollection?.Count} records ");
             }
 
         }
@@ -416,7 +396,7 @@ namespace CatanService.State
                     Sheep = this.Sheep,
                     GoldMine = this.GoldMine,
                     PlayerName = this.PlayerName,
-                    GameName = this.GameName,                   
+                    GameName = this.GameName,
                 };
 
                 return pr;
@@ -433,7 +413,7 @@ namespace CatanService.State
             {
                 switch (entitlement)
                 {
-                    
+
                     case Entitlement.DevCard:
                         break;
                     case Entitlement.Settlement:
@@ -445,10 +425,10 @@ namespace CatanService.State
                     case Entitlement.Road:
                         this.Roads++;
                         break;
-                    case Entitlement.Undefined:                       
+                    case Entitlement.Undefined:
                     default:
                         throw new Exception("Undefined Entitlment in TSAddEntitlement");
-                }                
+                }
             }
             finally
             {
@@ -482,7 +462,7 @@ namespace CatanService.State
                     case Entitlement.Undefined:
                     default:
                         throw new Exception("Undefined Entitlment in TSAddEntitlement");
-                } 
+                }
                 return true;
             }
             finally

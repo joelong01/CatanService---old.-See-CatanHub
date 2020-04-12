@@ -67,7 +67,7 @@ namespace CatanService.Controllers
         {
             if (log == null)
             {
-                return BadRequest(new CatanResult() {Error = CatanError.BadParameter, Description = "ResourceLog is null", Request = Request.Path });
+                return BadRequest(new CatanResult() { Error = CatanError.BadParameter, Description = "ResourceLog is null", Request = Request.Path });
             }
             (Game game, PlayerResources resources, IActionResult iaResult) = InternalPurchase(log.TradeResource, gameName, log.PlayerName, false);
             if (iaResult != null)
@@ -82,7 +82,7 @@ namespace CatanService.Controllers
                 Action = ServiceAction.ReturnResources,
                 PlayerName = log.PlayerName,
                 TradeResource = log.TradeResource,
-                RequestUrl = this.Request.Path,                
+                RequestUrl = this.Request.Path,
             });
 
             game.TSReleaseMonitors();
@@ -423,12 +423,12 @@ namespace CatanService.Controllers
             var game = TSGlobal.GetGame(gameName);
             if (game == null)
             {
-                return NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+                return NotFound(new CatanResult() { Error = CatanError.NoGameWithThatName, Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
             }
             var playerResources = game.GetPlayer(playerName);
             if (playerResources == null)
             {
-                return NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" });
+                return NotFound(new CatanResult() {Error = CatanError.NoPlayerWithThatName, Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" });
 
             }
 
@@ -437,12 +437,12 @@ namespace CatanService.Controllers
 
             if (playerResources.TSResourceCount(resourceType) < cost)
             {
-                return BadRequest(new CatanResult() { Request = this.Request.Path, Description = $"[Player={playerName}] [Game={gameName}]\n needs {cost} of {resourceType} only has {playerResources.TSResourceCount(resourceType)} " });
+                return BadRequest(new CatanResult() { Error=CatanError.NotEnoughResourcesToPurchase, Request = this.Request.Path, Description = $"[Player={playerName}] [Game={gameName}]\n needs {cost} of {resourceType} only has {playerResources.TSResourceCount(resourceType)} " });
             }
 
             playerResources.TSAddResource(resourceType, -cost);
             playerResources.TSAddResource(resourceType, 1);
-            game.TSAddLogRecord(new MeritimeTradeLog() { Cost = cost, PlayerName = playerName, Traded = resourceType, RequestUrl = this.Request.Path });
+            game.TSAddLogRecord(new MeritimeTradeLog() { Cost = cost, PlayerName = playerName, Traded = resourceType, RequestUrl = this.Request.Path, Action = ServiceAction.MeritimeTrade });
             game.TSReleaseMonitors();
             return Ok(playerResources);
         }

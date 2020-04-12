@@ -168,6 +168,7 @@ namespace CatanSharedModels
     }
     public class CatanResultWithBody<T> : CatanResult
     {
+        
         public T Body { get; set; }
         public CatanResultWithBody(T body, [CallerMemberName] string fName = "", [CallerFilePath] string codeFile = "", [CallerLineNumber] int lineNumber = -1) : base(fName, codeFile, lineNumber)
         {
@@ -401,7 +402,7 @@ namespace CatanSharedModels
             return 0;
         }
 
-        public bool EquivalentResourceCount(TradeResources tradeResources)
+        public bool Equivalent(TradeResources tradeResources)
         {
             if (Wheat != tradeResources.Wheat || Wood != tradeResources.Wood || Ore != tradeResources.Ore ||
                 Sheep != tradeResources.Sheep || Brick != tradeResources.Brick || GoldMine != tradeResources.GoldMine)

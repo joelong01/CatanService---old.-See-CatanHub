@@ -37,7 +37,7 @@ namespace ServiceTests
                     Sheep = startingResourceCount
                 };
                 var startingResources = await helper.Proxy.GrantResources(helper.GameName, players[0], startingResource);
-                Assert.True(startingResources.EquivalentResourceCount(startingResource));
+                Assert.True(startingResources.Equivalent(startingResource));
                 foreach (ResourceType restype in Enum.GetValues(typeof(ResourceType)))
                 {
                     // 
@@ -77,7 +77,7 @@ namespace ServiceTests
                     Assert.NotNull(resource);
                     //
                     //  make sure we got what we asked for
-                    Assert.True(resource.EquivalentResourceCount(loopTempResourceAsk + startingResource));
+                    Assert.True(resource.Equivalent(loopTempResourceAsk + startingResource));
 
                     //
                     //  get the log record - it should have resources we just granted
@@ -92,8 +92,9 @@ namespace ServiceTests
                     //
                     //  get the log for the Undo Action
                     lastLogRecord = await helper.GetLogRecordsFromEnd<ResourceLog>();
-                    Assert.Equal(ServiceAction.GrantResources, lastLogRecord.Action);
+                    Assert.Equal(ServiceAction.ReturnResources, lastLogRecord.Action);
                     Assert.True(lastLogRecord.PlayerResources.Equivalent(resourcesAfterUndo));
+                    Assert.True(lastLogRecord.PlayerResources.Equivalent(startingResource));
                     Assert.Equal(players[0], lastLogRecord.PlayerName);
 
 

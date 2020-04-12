@@ -78,7 +78,7 @@ namespace ServiceTests
 
 
             var resourceLog = await helper.GetLogRecordsFromEnd<ResourceLog>();
-            Assert.True(resourceLog.PlayerResources.EquivalentResourceCount(tr));
+            Assert.True(resourceLog.PlayerResources.Equivalent(tr));
 
             var purchaseLog = await helper.GetLogRecordsFromEnd<PurchaseLog>(2);
             var refundResources = await helper.Proxy.RefundEntitlement(helper.GameName, purchaseLog);

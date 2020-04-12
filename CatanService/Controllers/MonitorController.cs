@@ -39,7 +39,7 @@ namespace CatanService.Controllers
 
             }
             var logCollection = await clientState.TSWaitForLog();
-            if (logCollection.Count == 0)
+            if (logCollection == null || logCollection.Count == 0)
             {
                 return BadRequest(new CatanResult() { Request = this.Request.Path, Description = $"Why did {playerName} release with no log entries?" });
             }

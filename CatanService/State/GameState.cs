@@ -402,7 +402,7 @@ namespace CatanService.State
 
         }
 
-        public IEnumerable<string> Players
+        public ICollection<string> Players
         {
             get
             {

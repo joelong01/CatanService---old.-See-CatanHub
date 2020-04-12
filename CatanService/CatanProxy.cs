@@ -214,50 +214,52 @@ namespace Catan.Proxy
                 ServiceLogRecord logEntry = CatanProxy.Deserialize<ServiceLogRecord>(rec.ToString());
                 switch (logEntry.Action)
                 {
-                    case ServiceAction.Undefined:
-                        break;
+                    case ServiceAction.Refund:
                     case ServiceAction.Purchased:
                         PurchaseLog purchaseLog = CatanProxy.Deserialize<PurchaseLog>(rec.ToString());
                         records.Add(purchaseLog);
                         break;
+                    case ServiceAction.UserRemoved:
+                    case ServiceAction.GameDeleted:
                     case ServiceAction.PlayerAdded:
+                    case ServiceAction.GameStarted:
                         GameLog gameLog = CatanProxy.Deserialize<GameLog>(rec.ToString());
                         records.Add(gameLog);
                         break;
-                    case ServiceAction.UserRemoved:
-                        break;
-                    case ServiceAction.GameCreated:
-                        break;
-                    case ServiceAction.GameDeleted:
-                        break;
+                    case ServiceAction.PlayedYearOfPlenty:
                     case ServiceAction.TradeGold:
-                        break;
                     case ServiceAction.GrantResources:
+                    case ServiceAction.ReturnResources:
                         ResourceLog resourceLog = CatanProxy.Deserialize<ResourceLog>(rec.ToString());
                         records.Add(resourceLog);
                         break;
-                    case ServiceAction.TradeResources:
-                        break;
                     case ServiceAction.TakeCard:
-                        break;
-                    case ServiceAction.Refund:
+                        TakeLog takeLog = CatanProxy.Deserialize<TakeLog>(rec.ToString());
+                        records.Add(takeLog);
                         break;
                     case ServiceAction.MeritimeTrade:
+                        MeritimeTradeLog mtLog = CatanProxy.Deserialize<MeritimeTradeLog>(rec.ToString());
+                        records.Add(mtLog);
                         break;
                     case ServiceAction.UpdatedTurn:
-                        break;
-                    case ServiceAction.LostToMonopoly:
+                        TurnLog tLog = CatanProxy.Deserialize<TurnLog>(rec.ToString());
+                        records.Add(tLog);
                         break;
                     case ServiceAction.PlayedMonopoly:
-                        break;
-                    case ServiceAction.PlayedRoadBuilding:
+                    case ServiceAction.LostToMonopoly:
+                        MonopolyLog mLog = CatanProxy.Deserialize<MonopolyLog>(rec.ToString());
+                        records.Add(mLog);
                         break;
                     case ServiceAction.PlayedKnight:
+                    case ServiceAction.PlayedRoadBuilding:
+                        records.Add(logEntry);
                         break;
-                    case ServiceAction.PlayedYearOfPlenty:
-                        break;
+                    case ServiceAction.GameCreated:
+                    case ServiceAction.Undefined:
+                    case ServiceAction.TradeResources:
+                    
                     default:
-                        break;
+                        throw new Exception($"{logEntry.Action} has no Deserializer! logEntry: {logEntry}");
                 }
             }
             return records;
@@ -501,11 +503,14 @@ namespace Catan.Proxy
             }
         }
 
-
+        public void CancelAllRequests()
+        {
+            _cts.Cancel();
+        }
 
         public void Dispose()
         {
-            _cts.Cancel();
+            CancelAllRequests();
             Client.Dispose();
         }
         public static JsonSerializerOptions GetJsonOptions(bool indented = false)

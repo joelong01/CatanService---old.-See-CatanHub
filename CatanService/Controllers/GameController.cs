@@ -33,18 +33,34 @@ namespace CatanService.Controllers
                 var err = new CatanResultWithBody<GameInfo>(gameInfo)
                 {
                     Description = $"{playerName} in Game '{gameName}' attempted to register a game with different gameInfo.",
-                    Request = this.Request.Path
+                    Request = this.Request.Path,
+                    Error = CatanError.BadParameter
                 };
                 err.ExtendedInformation.Add(new KeyValuePair<string, object>("ExistingGameInfo", game));
                 return BadRequest(err);
+            
             }
+
             PlayerState clientState = game.GetPlayer(playerName);
             if (clientState != null)
             {
                 var err = new CatanResultWithBody<GameInfo>(gameInfo)
                 {
                     Description = $"{playerName} in Game '{gameName}' is already registered.",
-                    Request = this.Request.Path
+                    Request = this.Request.Path,
+                    Error = CatanError.PlayerAlreadyRegistered
+                };
+                err.ExtendedInformation.Add(new KeyValuePair<string, object>("ExistingGameInfo", clientState));
+                return BadRequest(err);
+            }
+
+            if (game.Started)
+            {
+                var err = new CatanResultWithBody<GameInfo>(gameInfo)
+                {
+                    Description = $"{playerName} attempting to join '{gameName}' that has already started",
+                    Request = this.Request.Path,
+                    Error = CatanError.GameAlreadStarted
                 };
                 err.ExtendedInformation.Add(new KeyValuePair<string, object>("ExistingGameInfo", clientState));
                 return BadRequest(err);
@@ -83,7 +99,7 @@ namespace CatanService.Controllers
                 return NotFound(err);
             }
             game.Started = true;
-            game.TSAddLogRecord(new GameLog() { Players = game.Players, PlayerName = "", Action = ServiceAction.PlayerAdded, RequestUrl = this.Request.Path });
+            game.TSAddLogRecord(new GameLog() { Players = game.Players, PlayerName = "", Action = ServiceAction.GameStarted, RequestUrl = this.Request.Path });
 
             game.TSReleaseMonitors();
             return Ok();

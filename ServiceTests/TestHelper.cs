@@ -28,8 +28,10 @@ namespace ServiceTests
                 AllowAutoRedirect = false
             });
         }
-        Timer _timer = null;
-        public async Task<List<string>> CreateGame()
+        private int _monitorIterations = 1;
+        private TaskCompletionSource<object> _monitorTCS = new TaskCompletionSource<object>();
+        private TaskCompletionSource<object> _monitorStart = new TaskCompletionSource<object>();
+        public async Task<List<string>> CreateGame(bool startGame = true)
         {
             var gameInfo = new GameInfo();
             var response = await Proxy.Register(gameInfo, GameName, "Doug");
@@ -40,33 +42,58 @@ namespace ServiceTests
             Assert.NotNull(response);
             response = await Proxy.Register(gameInfo, GameName, "Joe");
             Assert.NotNull(response);
-            await Proxy.StartGame(GameName);
+            if (startGame) await Proxy.StartGame(GameName);
 
             Players = await Proxy.GetUsers(GameName);
             Assert.Equal(4, Players.Count);
-            //  _timer = new Timer(OnTimerCallback, _timer, 0, 0);
 
             return Players;
         }
 
-        private async void OnTimerCallback(object state)
+        public Task StartMonitoring(int interations)
         {
-            _timer.Change(-1, -1);
-            List<ServiceLogRecord> logs;
-            do
+            _monitorIterations = interations;            
+            ThreadPool.QueueUserWorkItem(Monitor_Callback, interations);
+            return _monitorStart.Task;
+        }
+
+        public Task WaitForMonitorCompletion()
+        {
+            return _monitorTCS.Task;
+        }
+
+
+        private async void Monitor_Callback(object state)
+        {
+            Debug.WriteLine($"Monitor_Callback started. iterating {_monitorIterations} thread id = {Thread.CurrentThread.ManagedThreadId} ");
+            
+            List <ServiceLogRecord> logs;
+            int count = 0;
+            while (count < _monitorIterations)
             {
+                if (count == 0) _monitorStart.SetResult(null);
                 logs = await Proxy.Monitor(this.GameName, Players[0]);
+                
+                count++;
                 if (logs != null)
                 {
-                    LogCollection.Add(logs);
-                    break;
+                    Debug.WriteLine($"Monitor returned with {logs.Count} records");
+                    LogCollection.Add(logs);                    
                 }
+                else
+                {
+                    Debug.WriteLine($"Monitor returned with Zero records!!");
+                }
+                
 
-            } while (logs != null);
-
-            Debug.WriteLine("Exiting Timer thread");
+            }
+            if (count == _monitorIterations)
+            {
+                _monitorTCS.SetResult(null);
+                Debug.WriteLine("Exiting worker thread");
+            }
         }
-        public async Task<T> GetLogRecordsFromEnd<T>(int offset = 1 )
+        public async Task<T> GetLogRecordsFromEnd<T>(int offset = 1)
         {
             List<ServiceLogRecord> logCollection = await Proxy.GetAllLogs(GameName, Players[0], 0);
             if (logCollection == null)
@@ -75,10 +102,21 @@ namespace ServiceTests
             }
             Assert.NotNull(logCollection);
             Assert.NotEmpty(logCollection);
-            
-            T ret =  (T)(object)logCollection[^offset];
-            Assert.NotNull(ret);
-            return ret;
+
+            try
+            {
+                T ret = (T)(object)logCollection[^offset];
+                Assert.NotNull(ret);
+                return ret;
+            }
+            catch (InvalidCastException)
+            {
+                Debug.WriteLine($"Invalid Cast in GetLogRecordsFromEnd.  Wanted type {typeof(T).UnderlyingSystemType} got {logCollection[^offset].GetType().UnderlyingSystemType}");
+            }
+
+            return default;
+
+
 
 
         }
