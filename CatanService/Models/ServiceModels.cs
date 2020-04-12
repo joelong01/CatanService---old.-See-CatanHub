@@ -67,6 +67,8 @@ namespace CatanSharedModels
         public Guid CollectionId { get; set; }
     }
 
+
+
     public class ServiceLogRecord
     {
         public int Sequence { get; set; }
@@ -75,6 +77,7 @@ namespace CatanSharedModels
         public ServiceAction Action { get; set; } = ServiceAction.Undefined;
         public string PlayerName { get; set; }
         public string RequestUrl { get; set; }
+        public CatanRequest UndoRequest { get; set; } = null; // the request to undo this action
 
 
     }

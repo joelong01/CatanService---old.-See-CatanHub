@@ -18,8 +18,14 @@ namespace ServiceTests
         public GameInfo GameInfo { get; set; } = new GameInfo();
         public List<string> Players { get; set; }
         public List<List<ServiceLogRecord>> LogCollection { get; } = new List<List<ServiceLogRecord>>();
-        public TestHelper()
+        public TestHelper() : this(null)
         {
+            
+        }
+        public TestHelper(GameInfo gameInfo) : base()
+        {
+            if (!(gameInfo is null)) GameInfo = gameInfo;
+
             GameName = Guid.NewGuid().ToString();
             Proxy = new CatanProxy();
             var factory = new CustomWebApplicationFactory<Startup>();
@@ -33,14 +39,14 @@ namespace ServiceTests
         private TaskCompletionSource<object> _monitorStart = new TaskCompletionSource<object>();
         public async Task<List<string>> CreateGame(bool startGame = true)
         {
-            var gameInfo = new GameInfo();
-            var response = await Proxy.Register(gameInfo, GameName, "Doug");
+           
+            var response = await Proxy.Register(GameInfo, GameName, "Doug");
             Assert.NotNull(response);
-            response = await Proxy.Register(gameInfo, GameName, "Max");
+            response = await Proxy.Register(GameInfo, GameName, "Max");
             Assert.NotNull(response);
-            response = await Proxy.Register(gameInfo, GameName, "Wallace");
+            response = await Proxy.Register(GameInfo, GameName, "Wallace");
             Assert.NotNull(response);
-            response = await Proxy.Register(gameInfo, GameName, "Joe");
+            response = await Proxy.Register(GameInfo, GameName, "Joe");
             Assert.NotNull(response);
             if (startGame) await Proxy.StartGame(GameName);
 
@@ -52,7 +58,7 @@ namespace ServiceTests
 
         public Task StartMonitoring(int interations)
         {
-            _monitorIterations = interations;            
+            _monitorIterations = interations;
             ThreadPool.QueueUserWorkItem(Monitor_Callback, interations);
             return _monitorStart.Task;
         }
@@ -66,25 +72,25 @@ namespace ServiceTests
         private async void Monitor_Callback(object state)
         {
             Debug.WriteLine($"Monitor_Callback started. iterating {_monitorIterations} thread id = {Thread.CurrentThread.ManagedThreadId} ");
-            
-            List <ServiceLogRecord> logs;
+
+            List<ServiceLogRecord> logs;
             int count = 0;
             while (count < _monitorIterations)
             {
                 if (count == 0) _monitorStart.SetResult(null);
                 logs = await Proxy.Monitor(this.GameName, Players[0]);
-                
+
                 count++;
                 if (logs != null)
                 {
                     Debug.WriteLine($"Monitor returned with {logs.Count} records");
-                    LogCollection.Add(logs);                    
+                    LogCollection.Add(logs);
                 }
                 else
                 {
                     Debug.WriteLine($"Monitor returned with Zero records!!");
                 }
-                
+
 
             }
             if (count == _monitorIterations)
@@ -162,7 +168,10 @@ namespace ServiceTests
 
         public void Dispose()
         {
-            Proxy.DeleteGame(GameName);
+            
+            var result = Proxy.DeleteGame(GameName).Result;
+            Assert.NotNull(result);
+            Proxy.Dispose();
         }
     }
 }

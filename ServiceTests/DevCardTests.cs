@@ -23,29 +23,45 @@ namespace ServiceTests
         [Fact]
         async Task DevCardPurchase()
         {
-            TestHelper helper = new TestHelper();
-            using (helper)
+            int maxCards = 2;
+            GameInfo gameInfo = new GameInfo()
             {
-                string player = (await helper.CreateGame())[0];
+                YearOfPlenty = maxCards,
+                Knight = maxCards,
+                VictoryPoint = maxCards,
+                Monopoly = maxCards,
+                RoadBuilding = maxCards
+            };
 
+
+
+            using (var helper = new TestHelper(gameInfo))
+            {
+                string player = (await helper.CreateGame())[0]; // game is now started
+
+                //
+                //  get enough resources to buy all the cards - 5 * maxCards worth of devcarts
                 var tr = new TradeResources()
                 {
-                    Ore = 25,
-                    Wheat = 25,
-                    Sheep = 25
+                    Ore = maxCards * 5,
+                    Wheat = maxCards * 5,
+                    Sheep = maxCards * 5
                 };
 
                 var resources = await helper.GrantResourcesAndAssertResult(player, tr);
 
                 Assert.Empty(resources.DevCards);
-                for (int i = 0; i < 25; i++)
+
+                for (int i = 0; i < maxCards * 5; i++)
                 {
                     resources = await helper.Proxy.DevCardPurchase(helper.GameName, player);
-                    Assert.Equal(24 - i, resources.Ore);
-                    Assert.Equal(24 - i, resources.Wheat);
-                    Assert.Equal(24 - i, resources.Sheep);
+                    Assert.Equal(maxCards * 5 - i - 1, resources.Ore);
+                    Assert.Equal(maxCards * 5 - i - 1, resources.Wheat);
+                    Assert.Equal(maxCards * 5 - i - 1, resources.Sheep);
                     Assert.Equal(i, resources.DevCards.Count - 1);
                     Assert.False(resources.DevCards[i].Played);
+                    Assert.Null(helper.Proxy.LastError);
+                    Assert.Empty(helper.Proxy.LastErrorString);
                 }
 
                 Assert.Equal(0, resources.Wood);
@@ -54,6 +70,8 @@ namespace ServiceTests
                 Assert.Equal(0, resources.Brick);
                 Assert.Equal(0, resources.Ore);
                 Assert.Equal(0, resources.GoldMine);
+
+
                 int vp = 0;
                 int yop = 0;
                 int knight = 0;
@@ -85,29 +103,48 @@ namespace ServiceTests
                             break;
                     }
                 }
-                Assert.Equal(14, knight);
-                Assert.Equal(5, vp);
-                Assert.Equal(2, yop);
-                Assert.Equal(2, mono);
-                Assert.Equal(2, rb);
+                //
+                //  these are for the "normal" game
+                Assert.Equal(gameInfo.Knight, knight);
+                Assert.Equal(gameInfo.VictoryPoint, vp);
+                Assert.Equal(gameInfo.YearOfPlenty, yop);
+                Assert.Equal(gameInfo.Monopoly, mono);
+                Assert.Equal(gameInfo.RoadBuilding, rb);
 
+                //
+                //  try to buy a card w/ no resources
+                resources = await helper.Proxy.DevCardPurchase(helper.GameName, player);
+                Assert.Null(resources);
+                Assert.NotNull(helper.Proxy.LastError);
+                Assert.NotEmpty(helper.Proxy.LastErrorString);
+                Assert.Equal(CatanError.DevCardsSoldOut, helper.Proxy.LastError.Error);
+
+                //
+                //  grant resources for a devcard
                 tr.Ore = tr.Wheat = tr.Sheep = 1;
                 resources = await helper.Proxy.GrantResources(helper.GameName, player, tr);
                 Assert.Equal(1, resources.Ore);
                 Assert.Equal(1, resources.Wheat);
                 Assert.Equal(1, resources.Sheep);
+                Assert.Null(helper.Proxy.LastError);
+                Assert.Empty(helper.Proxy.LastErrorString);
 
+                //
+                // try to buy when you have resources -- still get an error
                 resources = await helper.Proxy.DevCardPurchase(helper.GameName, player);
                 Assert.Null(resources);
+                Assert.NotNull(helper.Proxy.LastError);
+                Assert.NotEmpty(helper.Proxy.LastErrorString);
                 Assert.Equal(CatanError.DevCardsSoldOut, helper.Proxy.LastError.Error);
+
+                //
+                //  setup to play YoP
                 tr = new TradeResources()
                 {
                     Wood = 1,
-                    Brick = 0
+                    Brick = 1
                 };
-                resources = await helper.Proxy.DevCardPurchase(helper.GameName, player);
-                Assert.Null(resources);
-                Assert.Equal(CatanError.DevCardsSoldOut, helper.Proxy.LastError.Error);
+
                 tr.Brick = 1;
                 for (int i = 0; i < yop; i++)
                 {
@@ -131,12 +168,21 @@ namespace ServiceTests
             }
 
         }
+
         [Fact]
         async Task MonopolyTest()
         {
 
-            TestHelper helper = new TestHelper();
-            using (helper)
+            GameInfo gameInfo = new GameInfo()
+            {
+                YearOfPlenty = 0,
+                Knight = 0,
+                VictoryPoint = 0,
+                Monopoly = 1,
+                RoadBuilding = 0
+            };
+
+            using (var helper = new TestHelper(gameInfo))
             {
                 var players = await helper.CreateGame();
                 var tr = new TradeResources()
@@ -152,44 +198,31 @@ namespace ServiceTests
                 foreach (string p in players)
                 {
                     _ = await helper.GrantResourcesAndAssertResult(p, tr);
+
                 }
                 DevelopmentCard monopoly = new DevelopmentCard()
                 {
                     Played = false,
                     DevCard = DevCardType.Monopoly,
                 };
-                tr = new TradeResources()
-                {
-                    Ore = 1,
-                    Wheat = 1,
-                    Sheep = 1,
-                    Brick = 0,
-                    Wood = 0
-                };
-                while (true) // have to keep buying until i randomly get a monopoly card
-                {
-                    // buy a dev card
-                    var resources = await helper.Proxy.DevCardPurchase(helper.GameName, players[0]);
-                    Assert.NotNull(resources);
-                    // is it monopoly?
-                    if (resources.DevCards.Contains(monopoly))
-                    {
-                        resources = await helper.Proxy.PlayMonopoly(helper.GameName, players[0], ResourceType.Wood);
-                        Assert.Equal(4, resources.Wood);
-                        Assert.Equal(0, resources.Ore);
-                        Assert.Equal(0, resources.Wheat);
-                        Assert.Equal(0, resources.Sheep);
-                        Assert.Equal(1, resources.Brick);
-                        Assert.Equal(0, resources.GoldMine);
-                        break;
-                    }
-                    //
-                    //  get resources for another dev card
-                    _ = await helper.GrantResourcesAndAssertResult(players[0], tr);
-                }
+
+                // buy a dev card - gameInfo says there is only 1 of them and it is Monopoly
+
+                var resources = await helper.Proxy.DevCardPurchase(helper.GameName, players[0]);
+                Assert.NotNull(resources);
+                Assert.Contains(monopoly, resources.DevCards);
+                resources = await helper.Proxy.PlayMonopoly(helper.GameName, players[0], ResourceType.Wood);
+                Assert.Equal(4, resources.Wood);
+                Assert.Equal(0, resources.Ore);
+                Assert.Equal(0, resources.Wheat);
+                Assert.Equal(0, resources.Sheep);
+                Assert.Equal(1, resources.Brick);
+                Assert.Equal(0, resources.GoldMine);
+
+
                 for (int i = 1; i < players.Count; i++)
                 {
-                    var resources = await helper.Proxy.GetResources(helper.GameName, players[i]);
+                    resources = await helper.Proxy.GetResources(helper.GameName, players[i]);
                     Assert.Equal(1, resources.Ore);
                     Assert.Equal(1, resources.Wheat);
                     Assert.Equal(1, resources.Sheep);
@@ -197,15 +230,29 @@ namespace ServiceTests
                     Assert.Equal(1, resources.Brick);
                     Assert.Equal(0, resources.GoldMine);
                 }
+                //
+                //  try to play it again
+                resources = await helper.Proxy.PlayMonopoly(helper.GameName, players[0], ResourceType.Wood);
+                Assert.Null(resources);
+                Assert.NotEmpty(helper.Proxy.LastErrorString);
+                Assert.NotNull(helper.Proxy.LastError);
+                Assert.Equal(CatanError.NoResource, helper.Proxy.LastError.Error);
 
             }
         }
         [Fact]
         async Task YearOfPlenty()
         {
+            GameInfo gameInfo = new GameInfo()
+            {
+                YearOfPlenty = 1,
+                Knight = 0,
+                VictoryPoint = 0,
+                Monopoly = 0,
+                RoadBuilding = 0
+            };
 
-            TestHelper helper = new TestHelper();
-            using (helper)
+            using (var helper = new TestHelper(gameInfo))
             {
                 var players = await helper.CreateGame();
                 var tr = new TradeResources()
@@ -222,12 +269,22 @@ namespace ServiceTests
                 {
                     _ = await helper.GrantResourcesAndAssertResult(p, tr);
                 }
-
+                DevelopmentCard YoP = new DevelopmentCard()
+                {
+                    Played = false,
+                    DevCard = DevCardType.YearOfPlenty,
+                };
                 PlayerResources resources = await helper.BuyDevCard(players[0], DevCardType.YearOfPlenty);
                 Assert.NotNull(resources);
+                Assert.Contains(YoP, resources.DevCards);
+
                 resources = await helper.Proxy.PlayYearOfPlenty(helper.GameName, players[0], tr);
                 Assert.Null(resources);
                 Assert.Equal(CatanError.BadTradeResources, helper.Proxy.LastError.Error);
+                Assert.NotNull(helper.Proxy.LastError.CantanRequest.Body);
+                Assert.Equal(BodyType.TradeResources, helper.Proxy.LastError.CantanRequest.BodyType);
+                tr = helper.Proxy.LastError.CantanRequest.Body as TradeResources;
+                Assert.NotNull(tr);
                 tr = new TradeResources()
                 {
                     Ore = 1,
@@ -237,10 +294,6 @@ namespace ServiceTests
                     Wood = 0
                 };
                 resources = await helper.Proxy.PlayYearOfPlenty(helper.GameName, players[0], tr);
-                if (resources == null)
-                {
-                    Debug.WriteLine($"{CatanProxy.Serialize(helper.Proxy.LastError, true)}");
-                }
                 Assert.NotNull(resources);
                 Assert.Equal(2, resources.Ore);
                 Assert.Equal(2, resources.Wheat);
@@ -257,7 +310,7 @@ namespace ServiceTests
                     Assert.Equal(1, resources.Wheat);
                     Assert.Equal(1, resources.Sheep);
                     Assert.Equal(1, resources.Brick);
-                    Assert.Equal(0, resources.Wood);                    
+                    Assert.Equal(0, resources.Wood);
                     Assert.Equal(0, resources.GoldMine);
                 }
 
@@ -267,31 +320,75 @@ namespace ServiceTests
         async Task RoadBuilding()
         {
 
-            TestHelper helper = new TestHelper();
-            using (helper)
+            GameInfo gameInfo = new GameInfo()
+            {
+                YearOfPlenty = 0,
+                Knight = 0,
+                VictoryPoint = 0,
+                Monopoly = 0,
+                RoadBuilding = 1
+            };
+
+            using (var helper = new TestHelper(gameInfo))
             {
                 var players = await helper.CreateGame();
+                var tr = new TradeResources()
+                {
+                    Ore = 1,
+                    Wheat = 1,
+                    Sheep = 1
+                };
+
+                _ = await helper.GrantResourcesAndAssertResult(players[0], tr);
                 PlayerResources resources = await helper.BuyDevCard(players[0], DevCardType.RoadBuilding);
+                Assert.Equal(0, resources.Roads);
                 Assert.NotNull(resources);
                 Assert.NotEmpty(resources.DevCards);
                 var roadBuilding = new DevelopmentCard() { DevCard = DevCardType.RoadBuilding, Played = false };
-                DevelopmentCard devCard = null;
-                foreach (var card in resources.DevCards)
-                {
-                    if (card.Equals(roadBuilding))
-                    {
-                        devCard = card;
-                        break;
-                    }
-                }
-                Assert.NotNull(devCard);
-                Assert.False(devCard.Played);
-                
+                Assert.Contains(roadBuilding, resources.DevCards);
                 resources = await helper.Proxy.PlayRoadBuilding(helper.GameName, players[0]);
                 Assert.NotNull(resources);
                 Assert.Equal(2, resources.Roads);
-                
+
             }
         }
+        [Fact]
+        async Task Knight()
+        {
+
+            GameInfo gameInfo = new GameInfo()
+            {
+                YearOfPlenty = 0,
+                Knight = 1,
+                VictoryPoint = 0,
+                Monopoly = 0,
+                RoadBuilding = 0
+            };
+
+            using (var helper = new TestHelper(gameInfo))
+            {
+                var players = await helper.CreateGame();
+                var tr = new TradeResources()
+                {
+                    Ore = 1,
+                    Wheat = 1,
+                    Sheep = 1
+                };
+
+                _ = await helper.GrantResourcesAndAssertResult(players[0], tr);
+                PlayerResources resources = await helper.BuyDevCard(players[0], DevCardType.Knight);
+                Assert.Equal(0, resources.Roads);
+                Assert.NotNull(resources);
+                Assert.NotEmpty(resources.DevCards);
+                var roadBuilding = new DevelopmentCard() { DevCard = DevCardType.Knight, Played = false };
+                Assert.Contains(roadBuilding, resources.DevCards);
+                Assert.False(resources.DevCards[0].Played);
+                resources = await helper.Proxy.PlayKnight(helper.GameName, players[0]);
+                Assert.NotNull(resources);
+                Assert.True(resources.DevCards[0].Played);
+
+            }
+        }
+
     }
 }

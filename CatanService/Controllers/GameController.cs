@@ -32,7 +32,7 @@ namespace CatanService.Controllers
             {
                 var err = new CatanResult(CatanError.BadParameter)
                 {
-                    CantanRequest = new CatanRequest() { RequestUrl = this.Request.Path, Body = gameInfo, BodyType = BodyType.GameInfo },
+                    CantanRequest = new CatanRequest() { Url = this.Request.Path, Body = gameInfo, BodyType = BodyType.GameInfo },
                     Description = $"{playerName} in Game '{gameName}' attempted to register a game with different gameInfo.",                                        
                 };
                 err.ExtendedInformation.Add(new KeyValuePair<string, object>("ExistingGameInfo", game));
@@ -45,7 +45,7 @@ namespace CatanService.Controllers
             {
                 var err = new CatanResult(CatanError.BadParameter)
                 {
-                    CantanRequest = new CatanRequest() { RequestUrl = this.Request.Path, Body = gameInfo, BodyType = BodyType.GameInfo },
+                    CantanRequest = new CatanRequest() { Url = this.Request.Path, Body = gameInfo, BodyType = BodyType.GameInfo },
                     Description = $"{playerName} in Game '{gameName}' is already registered.",
                   
                 };
@@ -57,7 +57,7 @@ namespace CatanService.Controllers
             {
                 var err = new CatanResult(CatanError.GameAlreadStarted)
                 {
-                    CantanRequest = new CatanRequest() { RequestUrl = this.Request.Path, Body = gameInfo, BodyType = BodyType.GameInfo },
+                    CantanRequest = new CatanRequest() { Url = this.Request.Path, Body = gameInfo, BodyType = BodyType.GameInfo },
                     Description = $"{playerName} attempting to join '{gameName}' that has already started",                    
                 };
                 err.ExtendedInformation.Add(new KeyValuePair<string, object>("ExistingGameInfo", clientState));
@@ -159,8 +159,11 @@ namespace CatanService.Controllers
             TSGlobal.Games.TSDeleteGame(gameName);
 
             game.TSAddLogRecord(new GameLog() { Players = game.Players, Action = ServiceAction.GameDeleted, RequestUrl = this.Request.Path });
-            game.TSReleaseMonitors(); 
-            return Ok(new CatanResult(CatanError.NoError) { Request = this.Request.Path, Description = $"{gameName} deleted" });
+            game.TSReleaseMonitors();
+            return Ok(new CatanResult(CatanError.NoError)
+            {
+                Request = this.Request.Path, Description = $"{gameName} deleted"
+            });
         }
 
 

@@ -22,11 +22,11 @@ namespace CatanSharedModels
     }
     public class CatanRequest
     {
-        public string RequestUrl { get; set; } = "";
+        public string Url { get; set; } = "";
         public object Body { get; set; } = null;
         public BodyType BodyType { get; set; } = BodyType.None;
         public CatanRequest() { }
-        public CatanRequest(string u, object b, BodyType t) { RequestUrl = u; Body = b; BodyType = t; }
+        public CatanRequest(string u, object b, BodyType t) { Url = u; Body = b; BodyType = t; }
     }
 
 
@@ -124,7 +124,7 @@ namespace CatanSharedModels
         public string FunctionName { get; set; }
         public string FilePath { get; set; }
         public int LineNumber { get; set; }
-        public string Request { get => _request.RequestUrl; set => request = value; }
+        public string Request { get => _request.Url; set => request = value; }
         public Guid ID { get; set; } = Guid.NewGuid(); // this gives us an ID at creation time that survives serialization and is globally unique
         public CatanError Error { get; set; } = CatanError.Unknown;
         public CatanResult() // for the Serializer

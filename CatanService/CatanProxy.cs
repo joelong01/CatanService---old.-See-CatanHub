@@ -74,59 +74,68 @@ namespace Catan.Proxy
 
 
 
-        public Task<PlayerResources> GetResources(string game, string player)
+        public Task<PlayerResources> GetResources(string gameName, string playerName)
         {
-            if (String.IsNullOrEmpty(game) || String.IsNullOrEmpty(player))
+            if (String.IsNullOrEmpty(gameName) || String.IsNullOrEmpty(playerName))
             {
                 throw new Exception("names can't be null or empty");
             }
-            string url = $"{HostName}/api/catan/resource/{game}/{player}";
+            string url = $"{HostName}/api/catan/resource/{gameName}/{playerName}";
             return Get<PlayerResources>(url);
         }
 
 
 
-        public Task<PlayerResources> DevCardPurchase(string game, string player)
+        public Task<PlayerResources> DevCardPurchase(string gameName, string playerName)
         {
-            if (String.IsNullOrEmpty(game) || String.IsNullOrEmpty(player))
+            if (String.IsNullOrEmpty(gameName) || String.IsNullOrEmpty(playerName))
             {
                 throw new Exception("names can't be null or empty");
             }
-            string url = $"{HostName}/api/catan/devcard/{game}/{player}";
+            string url = $"{HostName}/api/catan/devcard/{gameName}/{playerName}";
 
             return Post<PlayerResources>(url, null);
         }
-        public Task<PlayerResources> PlayYearOfPlenty(string gameName, string player, TradeResources tr)
+        public Task<PlayerResources> PlayYearOfPlenty(string gameName, string playerName, TradeResources tr)
         {
 
-            if (String.IsNullOrEmpty(gameName) || String.IsNullOrEmpty(player))
+            if (String.IsNullOrEmpty(gameName) || String.IsNullOrEmpty(playerName))
             {
                 throw new Exception("names can't be null or empty");
             }
-            string url = $"{HostName}/api/catan/devcard/play/yearofplenty/{gameName}/{player}";
+            string url = $"{HostName}/api/catan/devcard/play/yearofplenty/{gameName}/{playerName}";
 
             return Post<PlayerResources>(url, Serialize(tr));
         }
 
-
-
-        public Task<PlayerResources> PlayRoadBuilding(string game, string player)
+        public Task<PlayerResources> PlayKnight(string gameName, string playerName)
         {
-            if (String.IsNullOrEmpty(game) || String.IsNullOrEmpty(player))
+            if (String.IsNullOrEmpty(gameName) || String.IsNullOrEmpty(playerName))
             {
                 throw new Exception("names can't be null or empty");
             }
-            string url = $"{HostName}/api/catan/devcard/play/roadbuilding/{game}/{player}";
+            string url = $"{HostName}/api/catan/devcard/play/knight/{gameName}/{playerName}";
 
             return Post<PlayerResources>(url, null);
         }
-        public Task<PlayerResources> PlayMonopoly(string game, string player, ResourceType resourceType)
+
+        public Task<PlayerResources> PlayRoadBuilding(string gameName, string playerName)
         {
-            if (String.IsNullOrEmpty(game) || String.IsNullOrEmpty(player))
+            if (String.IsNullOrEmpty(gameName) || String.IsNullOrEmpty(playerName))
             {
                 throw new Exception("names can't be null or empty");
             }
-            string url = $"{HostName}/api/catan/devcard/play/monopoly/{game}/{player}/{resourceType}";
+            string url = $"{HostName}/api/catan/devcard/play/roadbuilding/{gameName}/{playerName}";
+
+            return Post<PlayerResources>(url, null);
+        }
+        public Task<PlayerResources> PlayMonopoly(string gameName, string playerName, ResourceType resourceType)
+        {
+            if (String.IsNullOrEmpty(gameName) || String.IsNullOrEmpty(playerName))
+            {
+                throw new Exception("names can't be null or empty");
+            }
+            string url = $"{HostName}/api/catan/devcard/play/monopoly/{gameName}/{playerName}/{resourceType}";
 
             return Post<PlayerResources>(url, null);
         }
@@ -137,26 +146,37 @@ namespace Catan.Proxy
             return Get<List<string>>(url);
 
         }
-        public Task<List<string>> GetUsers(string game)
+        public Task<List<string>> GetUsers(string gameName)
         {
-            if (String.IsNullOrEmpty(game))
+            if (String.IsNullOrEmpty(gameName))
             {
                 throw new Exception("names can't be null or empty");
             }
 
-            string url = $"{HostName}/api/catan/game/users/{game}";
+            string url = $"{HostName}/api/catan/game/users/{gameName}";
 
             return Get<List<string>>(url);
 
         }
-        public Task<GameInfo> GetGameInfo(string game)
+
+        public Task<PlayerResources> TradeGold(string gameName, string playerName, TradeResources tradeResources)
         {
-            if (String.IsNullOrEmpty(game))
+            if (String.IsNullOrEmpty(playerName) || String.IsNullOrEmpty(playerName))
+            {
+                throw new Exception("names can't be null or empty");
+            }
+            string url = $"{HostName}/api/catan/resource/tradegold/{gameName}/{playerName}";
+            return Post<PlayerResources>(url, Serialize(tradeResources));
+        }
+
+        public Task<GameInfo> GetGameInfo(string gameName)
+        {
+            if (String.IsNullOrEmpty(gameName))
             {
                 throw new Exception("names can't be null or empty");
             }
 
-            string url = $"{HostName}/api/catan/game/gameInfo/{game}";
+            string url = $"{HostName}/api/catan/game/gameInfo/{gameName}";
 
             return Get<GameInfo>(url);
 
@@ -178,28 +198,28 @@ namespace Catan.Proxy
 
         }
 
-        public Task StartGame(string game)
+        public Task StartGame(string gameName)
         {
-            if (String.IsNullOrEmpty(game))
+            if (String.IsNullOrEmpty(gameName))
             {
                 throw new Exception("names can't be null or empty");
             }
-            string url = $"{HostName}/api/catan/game/start/{game}";
+            string url = $"{HostName}/api/catan/game/start/{gameName}";
             return Post<string>(url, null);
         }
 
-        public async Task<List<ServiceLogRecord>> Monitor(string game, string player)
+        public async Task<List<ServiceLogRecord>> Monitor(string gameName, string playerName)
         {
-            if (String.IsNullOrEmpty(game))
+            if (String.IsNullOrEmpty(gameName))
             {
                 throw new Exception("names can't be null or empty");
             }
-            string url = $"{HostName}/api/catan/monitor/{game}/{player}";
+            string url = $"{HostName}/api/catan/monitor/{gameName}/{playerName}";
             string json = await Get<string>(url);
 
             ServiceLogCollection serviceLogCollection = CatanProxy.Deserialize<ServiceLogCollection>(json);
             List<ServiceLogRecord> records = ParseServiceLogRecord(serviceLogCollection);
-            //Debug.WriteLine($"[Game={game}] [Player={player}] [LogCount={logList.Count}]");
+            //Debug.WriteLine($"[Game={gameName}] [Player={playerName}] [LogCount={logList.Count}]");
             return records;
         }
 
@@ -265,13 +285,13 @@ namespace Catan.Proxy
             return records;
         }
 
-        public async Task<List<ServiceLogRecord>> GetAllLogs(string game, string player, int startAt)
+        public async Task<List<ServiceLogRecord>> GetAllLogs(string gameName, string playerName, int startAt)
         {
-            if (String.IsNullOrEmpty(game))
+            if (String.IsNullOrEmpty(gameName))
             {
                 throw new Exception("names can't be null or empty");
             }
-            string url = $"{HostName}/api/catan/monitor/logs/{game}/{player}/{startAt}";
+            string url = $"{HostName}/api/catan/monitor/logs/{gameName}/{playerName}/{startAt}";
             string json = await Get<string>(url);
             if (String.IsNullOrEmpty(json)) return null;
 
@@ -284,56 +304,56 @@ namespace Catan.Proxy
         }
 
         /// <summary>
-        ///     Takes resources (Ore, Wheat, etc.) from global pool and assigns to player
+        ///     Takes resources (Ore, Wheat, etc.) from global pool and assigns to playerName
         /// </summary>
-        /// <param name="game"></param>
-        /// <param name="player"></param>
+        /// <param name="gameName"></param>
+        /// <param name="playerName"></param>
         /// <param name="resources"></param>
         /// <returns></returns>
 
-        public Task<PlayerResources> GrantResources(string game, string player, TradeResources resources)
+        public Task<PlayerResources> GrantResources(string gameName, string playerName, TradeResources resources)
         {
-            if (String.IsNullOrEmpty(game) || String.IsNullOrEmpty(player))
+            if (String.IsNullOrEmpty(gameName) || String.IsNullOrEmpty(playerName))
             {
                 throw new Exception("names can't be null or empty");
             }
-            string url = $"{HostName}/api/catan/resource/grant/{game}/{player}";
+            string url = $"{HostName}/api/catan/resource/grant/{gameName}/{playerName}";
             var body = CatanProxy.Serialize<TradeResources>(resources);
             return Post<PlayerResources>(url, body);
         }
-        public Task<PlayerResources> ReturnResource(string game, string player, TradeResources resources)
+        public Task<PlayerResources> ReturnResource(string gameName, string playerName, TradeResources resources)
         {
-            if (String.IsNullOrEmpty(game) || String.IsNullOrEmpty(player))
+            if (String.IsNullOrEmpty(gameName) || String.IsNullOrEmpty(playerName))
             {
                 throw new Exception("names can't be null or empty");
             }
-            string url = $"{HostName}/api/catan/resource/return/{game}/{player}";
+            string url = $"{HostName}/api/catan/resource/return/{gameName}/{playerName}";
             var body = CatanProxy.Serialize<TradeResources>(resources);
             return Post<PlayerResources>(url, body);
         }
 
-        public Task<PlayerResources> UndoGrantResource(string game, ResourceLog lastLogRecord)
+        public Task<PlayerResources> UndoGrantResource(string gameName, ResourceLog lastLogRecord)
         {
             if (lastLogRecord is null)
             {
                 throw new Exception("log record can't be null");
             }
-            if (String.IsNullOrEmpty(game) || String.IsNullOrEmpty(lastLogRecord.PlayerName))
+            if (String.IsNullOrEmpty(gameName) || String.IsNullOrEmpty(lastLogRecord.PlayerName))
             {
                 throw new Exception("names can't be null or empty");
             }
 
-            string url = $"{HostName}/api/catan/resource/undo/{game}";
+            string url = $"{HostName}/api/catan/resource/undo/{gameName}";
             var body = CatanProxy.Serialize<ResourceLog>(lastLogRecord);
             return Post<PlayerResources>(url, body);
         }
-        public Task<List<PlayerResources>> Trade(string game, string fromPlayer, TradeResources from, string toPlayer, TradeResources to)
+        public Task<List<PlayerResources>> Trade(string gameName, string fromPlayer, TradeResources from, string toPlayer, TradeResources to)
         {
-            if (String.IsNullOrEmpty(fromPlayer) || String.IsNullOrEmpty(toPlayer) || String.IsNullOrEmpty(game))
+            if (String.IsNullOrEmpty(fromPlayer) || String.IsNullOrEmpty(toPlayer) || String.IsNullOrEmpty(gameName))
             {
                 throw new Exception("names can't be null or empty");
             }
-            string url = $"{HostName}/api/catan/resource/trade/{game}/{fromPlayer}/{toPlayer}";
+            string url = $"{HostName}/api/catan/resource/trade/{gameName}/{fromPlayer}/{toPlayer}";
             var body = CatanProxy.Serialize<TradeResources[]>(new TradeResources[] { from, to });
             return Post<List<PlayerResources>>(url, body);
         }
@@ -397,6 +417,8 @@ namespace Catan.Proxy
             }
             return default;
         }
+
+       
 
         private CatanResult ParseCatanResult(string json)
         {

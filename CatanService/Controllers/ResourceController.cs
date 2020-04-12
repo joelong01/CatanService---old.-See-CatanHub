@@ -52,24 +52,34 @@ namespace CatanService.Controllers
             {
                 return iaResult;
             }
-            game.TSAddLogRecord(new ResourceLog() { PlayerResources = resources, Action = ServiceAction.GrantResources, PlayerName = playerName, TradeResource = toAdd, RequestUrl = this.Request.Path });
+            game.TSAddLogRecord(new ResourceLog()
+            {
+                PlayerResources = resources,
+                Action = ServiceAction.GrantResources,
+                PlayerName = playerName,
+                TradeResource = toAdd,
+                RequestUrl = this.Request.Path,
+                
+                UndoRequest = new CatanRequest()
+                {
+                    Url = $"api/catan/resource/undo/{gameName}/{playerName}",
+                    Body = toAdd,
+                    BodyType = BodyType.TradeResources
+                }
+            }) ;
             game.TSReleaseMonitors();
             return Ok(resources);
 
 
 
         }
-        [HttpPost("undo/{gameName}")]
+        [HttpPost("undo/{gameName}/{playerName}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public IActionResult UndoGrantResources([FromBody] ResourceLog log, string gameName)
+        public IActionResult UndoGrantResources([FromBody] TradeResources tradeResource, string gameName, string playerName)
         {
-            if (log == null)
-            {
-                return BadRequest(new CatanResult(CatanError.BadParameter) {Description = "ResourceLog is null", Request = Request.Path });
-            }
-            (Game game, PlayerResources resources, IActionResult iaResult) = InternalPurchase(log.TradeResource, gameName, log.PlayerName, false);
+            (Game game, PlayerResources resources, IActionResult iaResult) = InternalPurchase(tradeResource, gameName, playerName, false);
             if (iaResult != null)
             {
                 return iaResult;
@@ -80,9 +90,15 @@ namespace CatanService.Controllers
             {
                 PlayerResources = resources,
                 Action = ServiceAction.ReturnResources,
-                PlayerName = log.PlayerName,
-                TradeResource = log.TradeResource,
+                PlayerName = playerName,
+                TradeResource = tradeResource,
                 RequestUrl = this.Request.Path,
+                UndoRequest = new CatanRequest()  // Undo the Undo is really Replay
+                {
+                    Url = $"api/catan/resource/grant/{gameName}/{playerName}",
+                    Body = tradeResource,
+                    BodyType = BodyType.TradeResources
+                }
             });
 
             game.TSReleaseMonitors();
@@ -113,7 +129,7 @@ namespace CatanService.Controllers
             {
                 return (game, null, BadRequest(new CatanResult(CatanError.BadTradeResources)
                 {
-                    CantanRequest = new CatanRequest() { RequestUrl = this.Request.Path, Body = toAdd, BodyType = BodyType.TradeResources },
+                    CantanRequest = new CatanRequest() { Url = this.Request.Path, Body = toAdd, BodyType = BodyType.TradeResources },
                     Description = $"{playerName} in game '{gameName}' is trying to {(add ? "grant" : "refund")} a negative resource"
                 }));
             }
@@ -190,7 +206,7 @@ namespace CatanService.Controllers
             {
                 return BadRequest(new CatanResult(CatanError.BadTradeResources)
                 {
-                    CantanRequest = new CatanRequest() { RequestUrl = this.Request.Path, Body = trade, BodyType = BodyType.TradeResources },
+                    CantanRequest = new CatanRequest() { Url = this.Request.Path, Body = trade, BodyType = BodyType.TradeResources },
                     Description = $"[Player={playerName}] [Game='{gameName}'] in tradegold, the #gold should be positiver instead of {trade.GoldMine}"
                 });
             }
@@ -199,7 +215,7 @@ namespace CatanService.Controllers
             {
                 return BadRequest(new CatanResult(CatanError.InsufficientResource)
                 {
-                    CantanRequest = new CatanRequest() { RequestUrl = this.Request.Path, Body = trade, BodyType = BodyType.TradeResources },
+                    CantanRequest = new CatanRequest() { Url = this.Request.Path, Body = trade, BodyType = BodyType.TradeResources },
                     Description = $"[Player={playerName}] [Game='{gameName}'] Asking for {askCount} resources, only have {trade.GoldMine} Gold"
                 });
             }
@@ -261,7 +277,7 @@ namespace CatanService.Controllers
             {
                 return BadRequest(new CatanResult(CatanError.InsufficientResource)
                 {
-                    CantanRequest = new CatanRequest() { RequestUrl = this.Request.Path, Body = trade, BodyType = BodyType.TradeResourcesList },
+                    CantanRequest = new CatanRequest() { Url = this.Request.Path, Body = trade, BodyType = BodyType.TradeResourcesList },
                     Description = $"[Player={fromName}] [Game={gameName}]\n has insufficient resources for the trade."
                 });
             }
@@ -274,7 +290,7 @@ namespace CatanService.Controllers
             {
                 return BadRequest(new CatanResult(CatanError.InsufficientResource)
                 {
-                    CantanRequest = new CatanRequest() { RequestUrl = this.Request.Path, Body = trade, BodyType = BodyType.TradeResourcesList },
+                    CantanRequest = new CatanRequest() { Url = this.Request.Path, Body = trade, BodyType = BodyType.TradeResourcesList },
                     Description = $"[Player={toName}] [Game={gameName}]\n has insufficient resources for the trade"
                 });
             }
@@ -417,7 +433,7 @@ namespace CatanService.Controllers
             var game = TSGlobal.GetGame(gameName);
             if (game == null)
             {
-                return NotFound(new CatanResult(CatanError.NoGameWithThatName) { CantanRequest = new CatanRequest() { RequestUrl = this.Request.Path, Body = null, BodyType = BodyType.None }, Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+                return NotFound(new CatanResult(CatanError.NoGameWithThatName) { CantanRequest = new CatanRequest() { Url = this.Request.Path, Body = null, BodyType = BodyType.None }, Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
             }
             var playerResources = game.GetPlayer(playerName);
             if (playerResources == null)

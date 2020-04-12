@@ -104,11 +104,28 @@ namespace ServiceTests
                     //  we should be back where we started
                     resourcesAfterUndo = await helper.Proxy.GetResources(helper.GameName, players[0]);
                     Assert.True(resourcesAfterUndo.Equivalent(startingResources));
-
-
-
-
+                  
                 }
+            }
+        }
+
+        [Fact]
+        public async Task TradeGold()
+        {
+
+            using (var helper = new TestHelper())
+            {
+                var players = await helper.CreateGame();
+                var tr = new TradeResources()
+                {
+                    GoldMine = 2
+                };
+
+                _ = await helper.GrantResourcesAndAssertResult(players[0], tr);
+                TradeResources tradeResources = new TradeResources() { };
+                //
+                //  try to trade with bad body
+                var resources = await helper.Proxy.TradeGold(helper.GameName, players[0], tradeResources);
             }
         }
     }
