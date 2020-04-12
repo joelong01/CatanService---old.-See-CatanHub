@@ -31,6 +31,9 @@ namespace CatanSharedModels
         PlayerAlreadyRegistered,
         GameAlreadStarted,
         Unknown,
+        InsufficientResource,
+        Unexpected,
+        NoError,
     }
     /// <summary>
     ///     this enum tells us what the data was used for. We often have data shapes for only one reason...

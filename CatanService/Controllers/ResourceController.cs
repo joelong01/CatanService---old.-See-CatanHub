@@ -28,12 +28,12 @@ namespace CatanService.Controllers
             var game = TSGlobal.GetGame(gameName);
             if (game == null)
             {
-                return NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+                return NotFound(new CatanResult(CatanError.NoGameWithThatName) { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
             }
             var resources = game.GetPlayer(playerName);
             if (resources == null)
             {
-                return NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" });
+                return NotFound(new CatanResult(CatanError.NoPlayerWithThatName) { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" });
 
             }
             return Ok(resources);
@@ -67,7 +67,7 @@ namespace CatanService.Controllers
         {
             if (log == null)
             {
-                return BadRequest(new CatanResult() { Error = CatanError.BadParameter, Description = "ResourceLog is null", Request = Request.Path });
+                return BadRequest(new CatanResult(CatanError.BadParameter) {Description = "ResourceLog is null", Request = Request.Path });
             }
             (Game game, PlayerResources resources, IActionResult iaResult) = InternalPurchase(log.TradeResource, gameName, log.PlayerName, false);
             if (iaResult != null)
@@ -96,12 +96,12 @@ namespace CatanService.Controllers
             var game = TSGlobal.GetGame(gameName);
             if (game == null)
             {
-                return (game, null, NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path }));
+                return (game, null, NotFound(new CatanResult(CatanError.NoGameWithThatName) { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path }));
             }
             var resources = game.GetPlayer(playerName);
             if (resources == null)
             {
-                return (game, null, NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" }));
+                return (game, null, NotFound(new CatanResult(CatanError.NoPlayerWithThatName) { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" }));
 
             }
             if (toAdd.Wheat < 0 ||
@@ -111,9 +111,9 @@ namespace CatanService.Controllers
                   toAdd.Wood < 0 ||
                   toAdd.GoldMine < 0)
             {
-                return (game, null, BadRequest(new CatanResultWithBody<TradeResources>(toAdd)
+                return (game, null, BadRequest(new CatanResult(CatanError.BadTradeResources)
                 {
-                    Request = this.Request.Path,
+                    CantanRequest = new CatanRequest() { RequestUrl = this.Request.Path, Body = toAdd, BodyType = BodyType.TradeResources },
                     Description = $"{playerName} in game '{gameName}' is trying to {(add ? "grant" : "refund")} a negative resource"
                 }));
             }
@@ -177,23 +177,31 @@ namespace CatanService.Controllers
             var game = TSGlobal.GetGame(gameName);
             if (game == null)
             {
-                return NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+                return NotFound(new CatanResult(CatanError.NoGameWithThatName) { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
             }
             var resources = game.GetPlayer(playerName);
             if (resources == null)
             {
-                return NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" });
+                return NotFound(new CatanResult(CatanError.NoPlayerWithThatName) { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" });
 
             }
 
             if (trade.GoldMine < 0) // not worrying about a read lock here...
             {
-                return BadRequest(new CatanResultWithBody<TradeResources>(trade) { Description = $"[Player={playerName}] [Game='{gameName}'] in tradegold, the #gold should be positiver instead of {trade.GoldMine}" });
+                return BadRequest(new CatanResult(CatanError.BadTradeResources)
+                {
+                    CantanRequest = new CatanRequest() { RequestUrl = this.Request.Path, Body = trade, BodyType = BodyType.TradeResources },
+                    Description = $"[Player={playerName}] [Game='{gameName}'] in tradegold, the #gold should be positiver instead of {trade.GoldMine}"
+                });
             }
             int askCount = trade.Brick + trade.Wood + trade.Wheat + trade.Ore + trade.Sheep;
             if (askCount > resources.GoldMine)
             {
-                return BadRequest(new CatanResultWithBody<TradeResources>(trade) { Description = $"[Player={playerName}] [Game='{gameName}'] Asking for {askCount} resources, only have {trade.GoldMine} Gold" });
+                return BadRequest(new CatanResult(CatanError.InsufficientResource)
+                {
+                    CantanRequest = new CatanRequest() { RequestUrl = this.Request.Path, Body = trade, BodyType = BodyType.TradeResources },
+                    Description = $"[Player={playerName}] [Game='{gameName}'] Asking for {askCount} resources, only have {trade.GoldMine} Gold"
+                });
             }
 
             trade.GoldMine = askCount;
@@ -223,18 +231,18 @@ namespace CatanService.Controllers
             var game = TSGlobal.GetGame(gameName);
             if (game == null)
             {
-                return NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+                return NotFound(new CatanResult(CatanError.NoGameWithThatName) { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
             }
             var fromResources = game.GetPlayer(fromName);
             if (fromResources == null)
             {
-                return NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{fromName} in game '{gameName}' not found" });
+                return NotFound(new CatanResult(CatanError.NoPlayerWithThatName) { Request = this.Request.Path, Description = $"{fromName} in game '{gameName}' not found" });
 
             }
             var toResources = game.GetPlayer(toName);
             if (toResources == null)
             {
-                return NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{toName} in game '{gameName}' not found" });
+                return NotFound(new CatanResult(CatanError.NoPlayerWithThatName) { Request = this.Request.Path, Description = $"{toName} in game '{gameName}' not found" });
 
             }
 
@@ -244,48 +252,34 @@ namespace CatanService.Controllers
 
             //
             //  validate that from has the cards needed
-            if (fromResources.Brick < fromTrade.Brick)
+
+            if (fromResources.Brick < fromTrade.Brick ||
+                fromResources.Wood < fromTrade.Wood ||
+                fromResources.Sheep < fromTrade.Sheep ||
+                fromResources.Ore < fromTrade.Ore ||
+                fromResources.Wheat < fromTrade.Wheat)
             {
-                return BadRequest(new CatanResultWithBody<TradeResources[]>(trade) { Request = this.Request.Path, Description = $"[Player={fromName}] [Game={gameName}]\n Asking for {fromTrade.Brick} Brick, only has {fromResources.Brick}" });
+                return BadRequest(new CatanResult(CatanError.InsufficientResource)
+                {
+                    CantanRequest = new CatanRequest() { RequestUrl = this.Request.Path, Body = trade, BodyType = BodyType.TradeResourcesList },
+                    Description = $"[Player={fromName}] [Game={gameName}]\n has insufficient resources for the trade."
+                });
             }
-            if (fromResources.Wood < fromTrade.Wood)
+            // validate that To has the cards needed
+            if (toResources.Brick < toTrade.Brick ||
+                toResources.Wood < toTrade.Wood ||
+                toResources.Sheep < toTrade.Sheep ||
+                toResources.Ore < toTrade.Ore ||
+                toResources.Wheat < toTrade.Wheat)
             {
-                return BadRequest(new CatanResultWithBody<TradeResources[]>(trade) { Request = this.Request.Path, Description = $"[Player={fromName}] [Game={gameName}]\n Asking for {fromTrade.Wood} Wood, only has {fromResources.Wood}" });
-            }
-            if (fromResources.Sheep < fromTrade.Sheep)
-            {
-                return BadRequest(new CatanResultWithBody<TradeResources[]>(trade) { Request = this.Request.Path, Description = $"[Player={fromName}] [Game={gameName}]\n Asking for {fromTrade.Sheep} Sheep, only has {fromResources.Sheep}" });
-            }
-            if (fromResources.Ore < fromTrade.Ore)
-            {
-                return BadRequest(new CatanResultWithBody<TradeResources[]>(trade) { Request = this.Request.Path, Description = $"[Player={fromName}] [Game={gameName}]\n Asking for {fromTrade.Ore} Ore, only has {fromResources.Ore}" });
-            }
-            if (fromResources.Wheat < fromTrade.Wheat)
-            {
-                return BadRequest(new CatanResultWithBody<TradeResources[]>(trade) { Request = this.Request.Path, Description = $"[Player={fromName}] [Game={gameName}]\n Asking for {fromTrade.Wheat} Wheat, only has {fromResources.Wheat}" });
+                return BadRequest(new CatanResult(CatanError.InsufficientResource)
+                {
+                    CantanRequest = new CatanRequest() { RequestUrl = this.Request.Path, Body = trade, BodyType = BodyType.TradeResourcesList },
+                    Description = $"[Player={toName}] [Game={gameName}]\n has insufficient resources for the trade"
+                });
             }
 
-            // validate that To has the cards needed
-            if (toResources.Brick < toTrade.Brick)
-            {
-                return BadRequest(new CatanResultWithBody<TradeResources[]>(trade) { Request = this.Request.Path, Description = $"[Player={toName}] [Game={gameName}]\n Asking for {toTrade.Brick} Brick, only has {toResources.Brick}" });
-            }
-            if (toResources.Wood < toTrade.Wood)
-            {
-                return BadRequest(new CatanResultWithBody<TradeResources[]>(trade) { Request = this.Request.Path, Description = $"[Player={toName}] [Game={gameName}]\n Asking for {toTrade.Wood} Wood, only has {toResources.Wood}" });
-            }
-            if (toResources.Sheep < toTrade.Sheep)
-            {
-                return BadRequest(new CatanResultWithBody<TradeResources[]>(trade) { Request = this.Request.Path, Description = $"[Player={toName}] [Game={gameName}]\n Asking for {toTrade.Sheep} Sheep, only has {toResources.Sheep}" });
-            }
-            if (toResources.Ore < toTrade.Ore)
-            {
-                return BadRequest(new CatanResultWithBody<TradeResources[]>(trade) { Request = this.Request.Path, Description = $"[Player={toName}] [Game={gameName}]\n Asking for {toTrade.Ore} Ore, only has {toResources.Ore}" });
-            }
-            if (toResources.Wheat < toTrade.Wheat)
-            {
-                return BadRequest(new CatanResultWithBody<TradeResources[]>(trade) { Request = this.Request.Path, Description = $"[Player={toName}] [Game={gameName}]\n Asking for {toTrade.Wheat} Wheat, only has {toResources.Wheat}" });
-            }
+
 
             // take from
             fromResources.TSAdd(fromTrade.GetNegated());
@@ -314,18 +308,18 @@ namespace CatanService.Controllers
             var game = TSGlobal.GetGame(gameName);
             if (game == null)
             {
-                return NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+                return NotFound(new CatanResult(CatanError.NoGameWithThatName) { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
             }
             var fromResources = game.GetPlayer(fromName);
             if (fromResources == null)
             {
-                return NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{fromName} in game '{gameName}' not found" });
+                return NotFound(new CatanResult(CatanError.NoPlayerWithThatName) { Request = this.Request.Path, Description = $"{fromName} in game '{gameName}' not found" });
 
             }
             var toResources = game.GetPlayer(toName);
             if (toResources == null)
             {
-                return NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{toName} in game '{gameName}' not found" });
+                return NotFound(new CatanResult(CatanError.NoPlayerWithThatName) { Request = this.Request.Path, Description = $"{toName} in game '{gameName}' not found" });
 
             }
             //
@@ -423,12 +417,12 @@ namespace CatanService.Controllers
             var game = TSGlobal.GetGame(gameName);
             if (game == null)
             {
-                return NotFound(new CatanResult() { Error = CatanError.NoGameWithThatName, Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+                return NotFound(new CatanResult(CatanError.NoGameWithThatName) { CantanRequest = new CatanRequest() { RequestUrl = this.Request.Path, Body = null, BodyType = BodyType.None }, Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
             }
             var playerResources = game.GetPlayer(playerName);
             if (playerResources == null)
             {
-                return NotFound(new CatanResult() {Error = CatanError.NoPlayerWithThatName, Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" });
+                return NotFound(new CatanResult(CatanError.NoPlayerWithThatName) { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" });
 
             }
 
@@ -437,7 +431,7 @@ namespace CatanService.Controllers
 
             if (playerResources.TSResourceCount(resourceType) < cost)
             {
-                return BadRequest(new CatanResult() { Error=CatanError.NotEnoughResourcesToPurchase, Request = this.Request.Path, Description = $"[Player={playerName}] [Game={gameName}]\n needs {cost} of {resourceType} only has {playerResources.TSResourceCount(resourceType)} " });
+                return BadRequest(new CatanResult(CatanError.NotEnoughResourcesToPurchase) { Request = this.Request.Path, Description = $"[Player={playerName}] [Game={gameName}]\n needs {cost} of {resourceType} only has {playerResources.TSResourceCount(resourceType)} " });
             }
 
             playerResources.TSAddResource(resourceType, -cost);

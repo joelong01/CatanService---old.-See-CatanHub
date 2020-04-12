@@ -81,12 +81,12 @@ namespace CatanService.Controllers
             var game = TSGlobal.GetGame(gameName);
             if (game == null)
             {
-                return NotFound(new CatanResult() { Error = CatanError.NoGameWithThatName, Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+                return NotFound(new CatanResult(CatanError.NoGameWithThatName) { CantanRequest = new CatanRequest() { RequestUrl = this.Request.Path, Body = null, BodyType = BodyType.None }, Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
             }
             var playerState = game.GetPlayer(player);
             if (playerState == null)
             {
-                return NotFound(new CatanResult() { Error = CatanError.NoPlayerWithThatName, Request = this.Request.Path, Description = $"{player} in game '{gameName}' not found" });
+                return NotFound(new CatanResult(CatanError.NoPlayerWithThatName) { Request = this.Request.Path, Description = $"{player} in game {gameName} not found" });
 
             }
 
@@ -94,23 +94,23 @@ namespace CatanService.Controllers
             var cost = PurchaseHelper.GetCost(entitlement);
             if (cost == null)
             {
-                return BadRequest(new CatanResult() { Error = CatanError.BadEntitlement, Request = this.Request.Path, Description = $"{entitlement} unknown or unset" });
+                return BadRequest(new CatanResult(CatanError.BadEntitlement) { Request = this.Request.Path, Description = $"{entitlement} unknown or unset" });
             }
             bool valid = PurchaseHelper.ValidateResources(playerState, cost);
             if (!valid)
             {
                 Response.StatusCode = 402;
-                return new JsonResult(new CatanResult() { Error = CatanError.NotEnoughResourcesToPurchase, Request = this.Request.Path, Description = $"{player} does not have the resources necessary to purchase {entitlement}" });
+                return new JsonResult(new CatanResult(CatanError.NotEnoughResourcesToPurchase) { Request = this.Request.Path, Description = $"{player} does not have the resources necessary to purchase {entitlement}" });
             }
 
             if (entitlement == Entitlement.DevCard)
             {
-                return BadRequest(new CatanResult() { Error = CatanError.BadEntitlement, Request = this.Request.Path, Description = $"{entitlement} is bought through the api/catan/devcard path" });
+                return BadRequest(new CatanResult(CatanError.BadEntitlement) { Request = this.Request.Path, Description = $"{entitlement} is bought through the api/catan/devcard path" });
             }
             bool available = playerState.TSAllocateEntitlement(entitlement); // are there entitlements of this type available?
             if (!available)
             {
-                return NotFound(new CatanResult() { Error = CatanError.LimitExceeded, Request = this.Request.Path, Description = $"{player} has the maximum allowd of {entitlement} " });
+                return NotFound(new CatanResult(CatanError.LimitExceeded) {  Request = this.Request.Path, Description = $"{player} has the maximum allowd of {entitlement} " });
             }
 
             playerState.TSAddEntitlement(entitlement);
@@ -135,29 +135,29 @@ namespace CatanService.Controllers
         {
             if (log is null)
             {
-                return BadRequest(new CatanResult() { Error=CatanError.BadParameter, Request = this.Request.Path, Description = $"{log.Entitlement} must be specified" });
+                return BadRequest(new CatanResult(CatanError.BadParameter) {  Request = this.Request.Path, Description = $"{log.Entitlement} must be specified" });
             }
             var playerName = log.PlayerName;
             var game = TSGlobal.GetGame(gameName);
             if (game == null)
             {
-                return NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+                return NotFound(new CatanResult(CatanError.NoGameWithThatName) { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
             }
             var resources = game.GetPlayer(playerName);
             if (resources == null)
             {
-                return NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" });
+                return NotFound(new CatanResult(CatanError.NoPlayerWithThatName) { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" });
 
             }
             var cost = PurchaseHelper.GetCost(log.Entitlement);
             if (cost == null)
             {
-                return BadRequest(new CatanResult() {Error=CatanError.BadLogRecord,  Request = this.Request.Path, Description = $"{log.Entitlement} must be specified" });
+                return BadRequest(new CatanResult(CatanError.BadLogRecord) {  Request = this.Request.Path, Description = $"{log.Entitlement} must be specified" });
             }
 
             if (resources.TSRemoveEntitlement(log.Entitlement) == false)
             {
-                return BadRequest(new CatanResult() { Request = this.Request.Path, Description = $"{playerName} does not have a {log.Entitlement} entitlement to refund" });
+                return BadRequest(new CatanResult(CatanError.BadEntitlement) { Request = this.Request.Path, Description = $"{playerName} does not have a {log.Entitlement} entitlement to refund" });
             }
 
 

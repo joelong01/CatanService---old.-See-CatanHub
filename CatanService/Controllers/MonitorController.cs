@@ -21,7 +21,7 @@ namespace CatanService.Controllers
             var game = TSGlobal.GetGame(gameName);
             if (game == null)
             {
-                return NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+                return NotFound(new CatanResult(CatanError.NoGameWithThatName) { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
             }
             //if (!game.Started)
             //{
@@ -35,13 +35,13 @@ namespace CatanService.Controllers
             if (clientState == null)
             {
 
-                return NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" });
+                return NotFound(new CatanResult(CatanError.NoPlayerWithThatName) { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" });
 
             }
             var logCollection = await clientState.TSWaitForLog();
             if (logCollection == null || logCollection.Count == 0)
             {
-                return BadRequest(new CatanResult() { Request = this.Request.Path, Description = $"Why did {playerName} release with no log entries?" });
+                return BadRequest(new CatanResult(CatanError.Unexpected) { Request = this.Request.Path, Description = $"Why did {playerName} release with no log entries?" });
             }
             return Ok(logCollection);
 
@@ -55,7 +55,7 @@ namespace CatanService.Controllers
             var game = TSGlobal.GetGame(gameName);
             if (game == null)
             {
-                return NotFound(new CatanResult() { Error=CatanError.NoGameWithThatName, Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+                 return NotFound(new CatanResult(CatanError.NoGameWithThatName) { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
             }
             
             var clientState = game.GetPlayer(playerName);
@@ -63,7 +63,7 @@ namespace CatanService.Controllers
             if (clientState == null)
             {
 
-                return NotFound(new CatanResult() {Error = CatanError.NoPlayerWithThatName, Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" });
+                return NotFound(new CatanResult(CatanError.NoPlayerWithThatName) { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" });
 
             }
 

@@ -382,7 +382,7 @@ namespace Catan.Proxy
                 LastErrorString = json;
                 try
                 {
-                    LastError = CatanProxy.Deserialize<CatanResult>(json);
+                    LastError = ParseCatanResult(json);
                 }
                 catch
                 {
@@ -396,6 +396,29 @@ namespace Catan.Proxy
                 return default;
             }
             return default;
+        }
+
+        private CatanResult ParseCatanResult(string json)
+        {
+            if (String.IsNullOrEmpty(json)) return null;
+            
+            var result = CatanProxy.Deserialize<CatanResult>(json);
+            switch (result.CantanRequest.BodyType)
+            {
+                case BodyType.TradeResources:
+                    result.CantanRequest.Body = CatanProxy.Deserialize<TradeResources>(result.CantanRequest.Body.ToString());
+                    break;                                    
+                case BodyType.GameInfo:
+                    result.CantanRequest.Body = CatanProxy.Deserialize<GameInfo>(result.CantanRequest.Body.ToString());
+                    break;
+                case BodyType.TradeResourcesList:
+                    result.CantanRequest.Body = CatanProxy.Deserialize<TradeResources[]>(result.CantanRequest.Body.ToString());
+                    break;
+                case BodyType.None:
+                default:
+                    break;
+            }
+            return result;
         }
 
         private async Task<T> Delete<T>(string url)
@@ -470,28 +493,23 @@ namespace Catan.Proxy
                 }
 
                 string json = await response.Content.ReadAsStringAsync();
-                if (typeof(T) == typeof(string))
-                {
-                    T workaround = (T)(object)json;
-                    return workaround;
-                }
                 if (response.IsSuccessStatusCode)
                 {
+                    if (typeof(T) == typeof(string))
+                    {
+                        T workaround = (T)(object)json;
+                        return workaround;
+                    }
+
                     T obj = CatanProxy.Deserialize<T>(json);
                     return obj;
                 }
                 else
                 {
-                    LastErrorString = await response.Content.ReadAsStringAsync();
-                    try
-                    {
-                        LastError = CatanProxy.Deserialize<CatanResult>(LastErrorString);
+                    LastErrorString = json;
+                    LastError = ParseCatanResult(json);
                         return default;
-                    }
-                    catch
-                    {
-                        return default;
-                    }
+                    
 
                 }
             }

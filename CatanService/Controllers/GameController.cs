@@ -30,11 +30,10 @@ namespace CatanService.Controllers
             var game = TSGlobal.Games.TSFindOrCreateGame(gameName, gameInfo);
             if (game.GameInfo != gameInfo)
             {
-                var err = new CatanResultWithBody<GameInfo>(gameInfo)
+                var err = new CatanResult(CatanError.BadParameter)
                 {
-                    Description = $"{playerName} in Game '{gameName}' attempted to register a game with different gameInfo.",
-                    Request = this.Request.Path,
-                    Error = CatanError.BadParameter
+                    CantanRequest = new CatanRequest() { RequestUrl = this.Request.Path, Body = gameInfo, BodyType = BodyType.GameInfo },
+                    Description = $"{playerName} in Game '{gameName}' attempted to register a game with different gameInfo.",                                        
                 };
                 err.ExtendedInformation.Add(new KeyValuePair<string, object>("ExistingGameInfo", game));
                 return BadRequest(err);
@@ -44,11 +43,11 @@ namespace CatanService.Controllers
             PlayerState clientState = game.GetPlayer(playerName);
             if (clientState != null)
             {
-                var err = new CatanResultWithBody<GameInfo>(gameInfo)
+                var err = new CatanResult(CatanError.BadParameter)
                 {
+                    CantanRequest = new CatanRequest() { RequestUrl = this.Request.Path, Body = gameInfo, BodyType = BodyType.GameInfo },
                     Description = $"{playerName} in Game '{gameName}' is already registered.",
-                    Request = this.Request.Path,
-                    Error = CatanError.PlayerAlreadyRegistered
+                  
                 };
                 err.ExtendedInformation.Add(new KeyValuePair<string, object>("ExistingGameInfo", clientState));
                 return BadRequest(err);
@@ -56,11 +55,10 @@ namespace CatanService.Controllers
 
             if (game.Started)
             {
-                var err = new CatanResultWithBody<GameInfo>(gameInfo)
+                var err = new CatanResult(CatanError.GameAlreadStarted)
                 {
-                    Description = $"{playerName} attempting to join '{gameName}' that has already started",
-                    Request = this.Request.Path,
-                    Error = CatanError.GameAlreadStarted
+                    CantanRequest = new CatanRequest() { RequestUrl = this.Request.Path, Body = gameInfo, BodyType = BodyType.GameInfo },
+                    Description = $"{playerName} attempting to join '{gameName}' that has already started",                    
                 };
                 err.ExtendedInformation.Add(new KeyValuePair<string, object>("ExistingGameInfo", clientState));
                 return BadRequest(err);
@@ -90,7 +88,7 @@ namespace CatanService.Controllers
             var game = TSGlobal.GetGame(gameName);
             if (game == null)
             {
-                var err = new CatanResult()
+                var err = new CatanResult(CatanError.NoGameWithThatName)
                 {
                     Description = $"Game '{gameName}' does not exist",
                     Request = this.Request.Path
@@ -112,16 +110,16 @@ namespace CatanService.Controllers
             var game = TSGlobal.GetGame(gameName);
             if (game == null)
             {
-                return NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+                return NotFound(new CatanResult(CatanError.NoGameWithThatName) { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
             }
             if (game.GetPlayer(oldPlayer) == null)
             {
-                return NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{oldPlayer} in game {gameName} not found" });
+                return NotFound(new CatanResult(CatanError.NoPlayerWithThatName) { Request = this.Request.Path, Description = $"{oldPlayer} in game {gameName} not found" });
 
             }            
             if (game.GetPlayer(newPlayer) == null)
             {
-                return NotFound(new CatanResult() { Request = this.Request.Path, Description = $"{oldPlayer} in game {gameName} not found" });
+                return NotFound(new CatanResult(CatanError.NoPlayerWithThatName) { Request = this.Request.Path, Description = $"{oldPlayer} in game {gameName} not found" });
 
             }
             game.TSAddLogRecord(new TurnLog() { NewPlayer = newPlayer, PlayerName = oldPlayer, RequestUrl = this.Request.Path });
@@ -136,7 +134,7 @@ namespace CatanService.Controllers
             var game = TSGlobal.GetGame(gameName);
             if (game == null)
             {
-                return NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+                return NotFound(new CatanResult(CatanError.NoGameWithThatName) { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
             }
 
             game.TSSetPlayerOrder(players);
@@ -155,14 +153,14 @@ namespace CatanService.Controllers
             var game = TSGlobal.GetGame(gameName);
             if (game == null)
             {
-                return NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+                return NotFound(new CatanResult(CatanError.NoGameWithThatName) { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
             }
                        
             TSGlobal.Games.TSDeleteGame(gameName);
 
             game.TSAddLogRecord(new GameLog() { Players = game.Players, Action = ServiceAction.GameDeleted, RequestUrl = this.Request.Path });
             game.TSReleaseMonitors(); 
-            return Ok(new CatanResult() { Request = this.Request.Path, Description = $"{gameName} deleted" });
+            return Ok(new CatanResult(CatanError.NoError) { Request = this.Request.Path, Description = $"{gameName} deleted" });
         }
 
 
@@ -176,7 +174,7 @@ namespace CatanService.Controllers
             var game = TSGlobal.GetGame(gameName);
             if (game == null)
             {
-                return NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+                return NotFound(new CatanResult(CatanError.NoGameWithThatName) { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
             }
             
             return Ok(game.Players);
@@ -200,7 +198,7 @@ namespace CatanService.Controllers
             var game = TSGlobal.GetGame(gameName);
             if (game == null)
             {
-                return NotFound(new CatanResult() { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+                return NotFound(new CatanResult(CatanError.NoGameWithThatName) { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
             }
 
             
@@ -212,7 +210,7 @@ namespace CatanService.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         public IActionResult GetHelp()
         {
-            return Ok(new CatanResult() { Request = this.Request.Path, Description = "You have landed on the Catan Service Help page!" });
+            return Ok(new CatanResult(CatanError.NoError) { Request = this.Request.Path, Description = "You have landed on the Catan Service Help page!" });
         }
 
 

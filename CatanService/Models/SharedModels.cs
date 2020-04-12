@@ -15,13 +15,18 @@ namespace CatanSharedModels
 
     public enum ResourceType { Sheep, Wood, Ore, Wheat, Brick, GoldMine, Desert, Back, None, Sea };
     public enum DevCardType { Knight, VictoryPoint, YearOfPlenty, RoadBuilding, Monopoly, Unknown };
-
+    public enum BodyType { TradeResources,
+        None,
+        GameInfo,
+        TradeResourcesList
+    }
     public class CatanRequest
     {
-        string Url { get; set; }
-        string Body { get; set; }
+        public string RequestUrl { get; set; } = "";
+        public object Body { get; set; } = null;
+        public BodyType BodyType { get; set; } = BodyType.None;
         public CatanRequest() { }
-        public CatanRequest(string u, string b) { Url = u; Body = b; }
+        public CatanRequest(string u, object b, BodyType t) { RequestUrl = u; Body = b; BodyType = t; }
     }
 
 
@@ -96,20 +101,40 @@ namespace CatanSharedModels
     }
     public class CatanResult
     {
+        private CatanRequest _request = new CatanRequest();
+        private string request;
+
+        public CatanRequest CantanRequest
+        {
+            get
+            {
+                return _request;
+            }
+            set
+            {
+                if (value != _request)
+                {
+                    _request = value;
+                }
+            }
+        }
+
         public List<KeyValuePair<string, object>> ExtendedInformation { get; } = new List<KeyValuePair<string, object>>();
         public string Description { get; set; }
         public string FunctionName { get; set; }
         public string FilePath { get; set; }
         public int LineNumber { get; set; }
-        public string Request { get; set; }
+        public string Request { get => _request.RequestUrl; set => request = value; }
         public Guid ID { get; set; } = Guid.NewGuid(); // this gives us an ID at creation time that survives serialization and is globally unique
         public CatanError Error { get; set; } = CatanError.Unknown;
         public CatanResult() // for the Serializer
         {
 
         }
-        public CatanResult([CallerMemberName] string fName = "", [CallerFilePath] string codeFile = "", [CallerLineNumber] int lineNumber = -1)
+       
+        public CatanResult(CatanError error, [CallerMemberName] string fName = "", [CallerFilePath] string codeFile = "", [CallerLineNumber] int lineNumber = -1)
         {
+            Error = error;
             FunctionName = fName;
             FilePath = codeFile;
             LineNumber = lineNumber;
@@ -176,16 +201,7 @@ namespace CatanSharedModels
             return (CatanResult)obj == this;
         }
     }
-    public class CatanResultWithBody<T> : CatanResult
-    {
-
-        public T Body { get; set; }
-        public CatanResultWithBody(T body, [CallerMemberName] string fName = "", [CallerFilePath] string codeFile = "", [CallerLineNumber] int lineNumber = -1) : base(fName, codeFile, lineNumber)
-        {
-            Body = body;
-        }
-
-    }
+  
 
     public class DevelopmentCard : IEquatable<DevelopmentCard>
     {
