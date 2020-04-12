@@ -72,7 +72,7 @@ namespace Catan.Proxy
 
         }
 
-       
+
 
         public Task<PlayerResources> GetResources(string game, string player)
         {
@@ -257,7 +257,7 @@ namespace Catan.Proxy
                     case ServiceAction.GameCreated:
                     case ServiceAction.Undefined:
                     case ServiceAction.TradeResources:
-                    
+
                     default:
                         throw new Exception($"{logEntry.Action} has no Deserializer! logEntry: {logEntry}");
                 }

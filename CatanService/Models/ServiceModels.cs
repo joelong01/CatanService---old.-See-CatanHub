@@ -58,6 +58,7 @@ namespace CatanSharedModels
     /// </summary>
     public class ServiceLogCollection
     {
+        public int SequenceNumber { get; set; }
         public int Count { get; set; }
         public List<object> LogRecords { get; set; }
         public Guid CollectionId { get; set; }

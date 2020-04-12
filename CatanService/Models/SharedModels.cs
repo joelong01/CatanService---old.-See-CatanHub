@@ -16,6 +16,16 @@ namespace CatanSharedModels
     public enum ResourceType { Sheep, Wood, Ore, Wheat, Brick, GoldMine, Desert, Back, None, Sea };
     public enum DevCardType { Knight, VictoryPoint, YearOfPlenty, RoadBuilding, Monopoly, Unknown };
 
+    public class CatanRequest
+    {
+        string Url { get; set; }
+        string Body { get; set; }
+        public CatanRequest() { }
+        public CatanRequest(string u, string b) { Url = u; Body = b; }
+    }
+
+
+
     public class GameInfo
     {
         public int MaxRoads { get; set; } = 15;
@@ -106,9 +116,9 @@ namespace CatanSharedModels
         }
         public static bool operator ==(CatanResult a, CatanResult b)
         {
-            if (a is null)
+            if (a is null || b is null)
             {
-                if (b is null)
+                if (b is null && a is null)
                 {
                     return true;
                 }
@@ -168,7 +178,7 @@ namespace CatanSharedModels
     }
     public class CatanResultWithBody<T> : CatanResult
     {
-        
+
         public T Body { get; set; }
         public CatanResultWithBody(T body, [CallerMemberName] string fName = "", [CallerFilePath] string codeFile = "", [CallerLineNumber] int lineNumber = -1) : base(fName, codeFile, lineNumber)
         {
@@ -210,11 +220,11 @@ namespace CatanSharedModels
         {
             return new TradeResources()
             {
-                Wheat = a.Wheat +   b.Wheat,
-                Wood = a.Wood +     b.Wood,
-                Ore = a.Ore +       b.Ore,
-                Sheep = a.Sheep +   b.Sheep,
-                Brick = a.Brick +   b.Brick,
+                Wheat = a.Wheat + b.Wheat,
+                Wood = a.Wood + b.Wood,
+                Ore = a.Ore + b.Ore,
+                Sheep = a.Sheep + b.Sheep,
+                Brick = a.Brick + b.Brick,
                 GoldMine = a.GoldMine + b.GoldMine
             };
         }
