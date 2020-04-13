@@ -377,6 +377,10 @@ namespace CatanSharedModels
 
         [JsonIgnore]
         public int Total => Wheat + Wood + Brick + Ore + Sheep + GoldMine;
+        public override string ToString()
+        {
+            return $"[Total={Total}][Ore={Ore}][Brick={Brick}][Wheat={Wheat}][Wood={Wood}][Sheep={Sheep}]";
+        }
     }
 
     public class PlayerResources
@@ -399,7 +403,10 @@ namespace CatanSharedModels
 
         [JsonIgnore]
         public int TotalResources => Wheat + Wood + Brick + Ore + Sheep + GoldMine;
-
+        public override string ToString()
+        {
+            return $"[Resources={TotalResources}] [DevCards={DevCards?.Count}] [Stuff={Settlements+Roads+Cities}]";
+        }
         public PlayerResources() { }
 
         public int GetResourceCount(ResourceType rt)
