@@ -237,6 +237,7 @@ namespace Catan.Proxy
                     case ServiceAction.Refund:
                     case ServiceAction.Purchased:
                         PurchaseLog purchaseLog = CatanProxy.Deserialize<PurchaseLog>(rec.ToString());
+                        ParseCatanRequest(purchaseLog.UndoRequest);
                         records.Add(purchaseLog);
                         break;
                     case ServiceAction.UserRemoved:
@@ -418,29 +419,42 @@ namespace Catan.Proxy
             return default;
         }
 
-       
+
 
         private CatanResult ParseCatanResult(string json)
         {
             if (String.IsNullOrEmpty(json)) return null;
-            
+
             var result = CatanProxy.Deserialize<CatanResult>(json);
-            switch (result.CantanRequest.BodyType)
+            ParseCatanRequest(result.CantanRequest);
+
+            return result;
+        }
+
+        /// <summary>
+        ///     System.Text.Json does not do polymorphic Deserialization. So we serialize the object and its type.  here 
+        ///     we switch on the type and then covert the JSON returned by ASP.net to string and then deserialize it into the 
+        ///     right type.
+        /// </summary>
+        /// <param name="unparsedRequest"></param>
+        private void ParseCatanRequest(CatanRequest unparsedRequest)
+        {
+            if (unparsedRequest == null) return;
+            switch (unparsedRequest.BodyType)
             {
                 case BodyType.TradeResources:
-                    result.CantanRequest.Body = CatanProxy.Deserialize<TradeResources>(result.CantanRequest.Body.ToString());
-                    break;                                    
+                    unparsedRequest.Body = CatanProxy.Deserialize<TradeResources>(unparsedRequest.Body.ToString());
+                    break;
                 case BodyType.GameInfo:
-                    result.CantanRequest.Body = CatanProxy.Deserialize<GameInfo>(result.CantanRequest.Body.ToString());
+                    unparsedRequest.Body = CatanProxy.Deserialize<GameInfo>(unparsedRequest.Body.ToString());
                     break;
                 case BodyType.TradeResourcesList:
-                    result.CantanRequest.Body = CatanProxy.Deserialize<TradeResources[]>(result.CantanRequest.Body.ToString());
+                    unparsedRequest.Body = CatanProxy.Deserialize<TradeResources[]>(unparsedRequest.Body.ToString());
                     break;
                 case BodyType.None:
                 default:
                     break;
             }
-            return result;
         }
 
         private async Task<T> Delete<T>(string url)
@@ -489,6 +503,17 @@ namespace Catan.Proxy
             }
         }
 
+        public Task<T> PostUndoRequest<T>(CatanRequest undoRequest)
+        {
+            if (undoRequest == null || String.IsNullOrEmpty(undoRequest.Url))
+            {
+                throw new Exception("names can't be null or empty");
+            }
+            string url = $"{HostName}/{undoRequest.Url}";
+            string body = CatanProxy.Serialize<object>(undoRequest.Body);                        
+            return Post<T>(url, body);
+        }
+        
         private async Task<T> Post<T>(string url, string body)
         {
 
@@ -530,8 +555,8 @@ namespace Catan.Proxy
                 {
                     LastErrorString = json;
                     LastError = ParseCatanResult(json);
-                        return default;
-                    
+                    return default;
+
 
                 }
             }
@@ -566,6 +591,7 @@ namespace Catan.Proxy
         }
         static public string Serialize<T>(T obj, bool indented = false)
         {
+            if (obj is null) return null;
             return JsonSerializer.Serialize<T>(obj, GetJsonOptions(indented));
         }
         static public T Deserialize<T>(string json)
