@@ -5,12 +5,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Models\CatanModels.cs" />
+    <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="3.1.2" />
+    <PackageReference Include="System.Text.Json" Version="5.0.0-preview.4.20205.13" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="3.1.2" />
-    <PackageReference Include="System.Text.Json" Version="5.0.0-preview.4.20205.13" />
+    <ProjectReference Include="..\..\Catan\CatanProxy\CatanProxy.csproj" />
   </ItemGroup>
 
 
