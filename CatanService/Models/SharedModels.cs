@@ -27,6 +27,10 @@ namespace CatanSharedModels
         public BodyType BodyType { get; set; } = BodyType.None;
         public CatanRequest() { }
         public CatanRequest(string u, object b, BodyType t) { Url = u; Body = b; BodyType = t; }
+        public override string ToString()
+        {
+            return $"[BodyType={BodyType}][Url={Url}][Body={Body?.ToString()}]";
+        }
     }
 
 
@@ -405,7 +409,7 @@ namespace CatanSharedModels
         public int TotalResources => Wheat + Wood + Brick + Ore + Sheep + GoldMine;
         public override string ToString()
         {
-            return $"[Resources={TotalResources}] [DevCards={DevCards?.Count}] [Stuff={Settlements+Roads+Cities}]";
+            return $"[Total={TotalResources}][Ore={Ore}][Brick={Brick}][Wheat={Wheat}][Wood={Wood}][Sheep={Sheep}] [DevCards={DevCards?.Count}][Stuff={Settlements+Roads+Cities}]";
         }
         public PlayerResources() { }
 

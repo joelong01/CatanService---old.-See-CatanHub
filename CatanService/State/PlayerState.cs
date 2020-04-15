@@ -15,7 +15,7 @@ namespace CatanService.State
         private ReaderWriterLockSlim ResourceLock { get; } = new ReaderWriterLockSlim(); // protects access to this ResourceTracking
         private List<object> _log = new List<object>(); // this one gets wiped every time TSWaitForLog returns
         private List<object> _permLog = new List<object>(); // this one has *everything*
-        private TaskCompletionSource<object> _tcs = null;
+        private TaskCompletionSource<object> _tcs = new TaskCompletionSource<object>();
         private ReaderWriterLockSlim TCSLock { get; } = new ReaderWriterLockSlim(); // protects access to this ResourceTracking
 
         public GameInfo ResourcesLeft { get; set; } // a game info where we will keep track of how many resources we can allocate
@@ -30,7 +30,7 @@ namespace CatanService.State
 
 
                     case Entitlement.Settlement:
-                        ResourcesLeft.MaxSettlements--;
+                        ResourcesLeft.MaxSettlements++;
                         break;
                     case Entitlement.City:
                         ResourcesLeft.MaxCities++;
@@ -123,22 +123,14 @@ namespace CatanService.State
             ServiceLogCollection logCollection = null;
             try
             {
-
-                if (_tcs == null)
-                {
-
-                    _tcs = new TaskCompletionSource<object>();
-
-                }
-                else
-                {
-                    Debug.WriteLine($"{PlayerName} has a non null TCS!");
-
-                }
-                await _tcs.Task;
-
-                _tcs = null;
                 var list = TSGetLogEntries();
+                if (list.Count == 0)
+                {
+                    await _tcs.Task;
+                    list = TSGetLogEntries();
+                    _tcs = new TaskCompletionSource<object>();
+                }
+
                 logCollection = new ServiceLogCollection()
                 {
                     LogRecords = list,
@@ -173,18 +165,22 @@ namespace CatanService.State
 
         public void TSReleaseLogToClient()
         {
-            Debug.WriteLine($"Releasing log for {PlayerName}");
-            //TCSLock.EnterWriteLock();
+            //            Debug.WriteLine($"Releasing log for {PlayerName}");
+            bool tookLock = false;
+            if (!TCSLock.IsWriteLockHeld)
+            {
+                TCSLock.EnterWriteLock();
+                tookLock = true;
+            }
             try
             {
-                if (_tcs != null) // if this is null, nobody is waiting
-                {
-                    _tcs.SetResult(null);
-                }
+                _tcs.SetResult(null);
+                _tcs = new TaskCompletionSource<object>();
+
             }
             finally
             {
-                if (TCSLock.IsWriteLockHeld)
+                if (tookLock)
                 {
                     TCSLock.ExitWriteLock();
                 }

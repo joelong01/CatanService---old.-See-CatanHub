@@ -101,7 +101,7 @@ namespace ServiceTests
         }
         public async Task<T> GetLogRecordsFromEnd<T>(int offset = 1)
         {
-            List<ServiceLogRecord> logCollection = await Proxy.GetAllLogs(GameName, Players[0], 0);
+            List<ServiceLogRecord> logCollection = await Proxy.GetAllLogs(GameName, Players[0], offset);
             if (logCollection == null)
             {
                 Debug.WriteLine($"LogCollection is null! {this.Proxy.LastError} {this.Proxy.LastErrorString}");
@@ -122,11 +122,48 @@ namespace ServiceTests
 
             return default;
 
-
-
-
         }
 
+        /// <summary>
+        ///     Note if you call this and there are no records, you will hang...
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="player"></param>
+        /// <returns></returns>
+        public async Task<T> MonitorGetLastRecord<T>(string player)
+        {
+            List<ServiceLogRecord> logCollection = await Proxy.Monitor(GameName, player);
+            T ret = (T)(object)logCollection[^1];
+            return ret;
+        }
+
+      
+        public async Task<PurchaseLog> GetAndValidatePurchaseLog(string player)
+        {
+            var purchaseLog = await MonitorGetLastRecord<PurchaseLog>(player);
+
+
+            return purchaseLog;
+        }
+
+        /// <summary>
+        ///     Get the log for a purchase that just happened 
+        ///     this needs to be called after a Purchase and before the next service call that logs, or you will hang
+        ///     Validates
+        ///         1. log is not null
+        ///         2. PlayerResources in log are the same as passed in
+        ///         
+        /// </summary>
+        /// <param name="player"></param>
+        /// <param name="resources"></param>
+        /// <returns></returns>
+        public async Task<ResourceLog> GetAndValidateResourceLog(string player, PlayerResources resources)
+        {
+            var resourceLog = await MonitorGetLastRecord<ResourceLog>(player);
+            Assert.NotNull(resourceLog);
+            Assert.True(resourceLog.PlayerResources.Equivalent(resources));
+            return resourceLog;
+        }
         public async Task<PlayerResources> GrantResourcesAndAssertResult(string player, TradeResources tr)
         {
             PlayerResources oldResources = await Proxy.GetResources(GameName, player);
@@ -171,6 +208,7 @@ namespace ServiceTests
             
             var result = Proxy.DeleteGame(GameName).Result;
             Assert.NotNull(result);
+            Assert.Equal(CatanError.NoError, result.Error);
             Proxy.Dispose();
         }
     }

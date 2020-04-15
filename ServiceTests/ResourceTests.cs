@@ -81,29 +81,33 @@ namespace ServiceTests
 
                     //
                     //  get the log record - it should have resources we just granted
-                    var lastLogRecord = await helper.GetLogRecordsFromEnd<ResourceLog>();
-                    Assert.True(lastLogRecord.PlayerResources.Equivalent(resourcesAfterGrant));
-                    Assert.True(lastLogRecord.TradeResource.Equivalent(loopTempResourceAsk));
+                    List<ServiceLogRecord> logCollection = await helper.Proxy.Monitor(helper.GameName, players[0]);
+                    var resourceLog = logCollection[^1] as ResourceLog;
+                    Assert.True(resourceLog.PlayerResources.Equivalent(resourcesAfterGrant));
+                    Assert.True(resourceLog.TradeResource.Equivalent(loopTempResourceAsk));
 
 
                     // make sure the Undo CatanRequest is set
-                    Assert.NotNull(lastLogRecord.UndoRequest);
-                    Assert.Equal(BodyType.TradeResources, lastLogRecord.UndoRequest.BodyType);
-                    Assert.NotNull(lastLogRecord.UndoRequest.Body);
+                    Assert.NotNull(resourceLog.UndoRequest);
+                    Assert.Equal(BodyType.TradeResources, resourceLog.UndoRequest.BodyType);
+                    Assert.NotNull(resourceLog.UndoRequest.Body);
 
                     // use the Undo Request
-                    var resourcesAfterUndo = await helper.Proxy.PostUndoRequest<PlayerResources>(lastLogRecord.UndoRequest);
+                    var resourcesAfterUndo = await helper.Proxy.PostUndoRequest<PlayerResources>(resourceLog.UndoRequest);
                     Assert.NotNull(resourcesAfterUndo);
                     Assert.True(resourcesAfterUndo.Equivalent(startingResources));
-
+                    resourceLog = null; // to make sure we don't use it below
                     //
                     //  get the log for the Undo Action
-                    lastLogRecord = await helper.GetLogRecordsFromEnd<ResourceLog>();
-                    Assert.Equal(ServiceAction.ReturnResources, lastLogRecord.Action);
-                    Assert.True(lastLogRecord.PlayerResources.Equivalent(resourcesAfterUndo));
-                    Assert.True(lastLogRecord.PlayerResources.Equivalent(startingResource));
-                    Assert.Equal(players[0], lastLogRecord.PlayerName);
-
+                    logCollection = await helper.Proxy.Monitor(helper.GameName, players[0]);
+                    ResourceLog undoLog = logCollection[^1] as ResourceLog;
+                    Assert.Equal(ServiceAction.ReturnResources, undoLog.Action);
+                    Assert.True(undoLog.PlayerResources.Equivalent(resourcesAfterUndo));
+                    Assert.True(undoLog.PlayerResources.Equivalent(startingResource));
+                    Assert.Equal(players[0], undoLog.PlayerName);
+                    Assert.NotNull(undoLog.UndoRequest);
+                    Assert.NotNull(undoLog.UndoRequest.Body);
+                    Assert.Equal(BodyType.TradeResources, undoLog.UndoRequest.BodyType);
 
 
                     //
@@ -111,19 +115,11 @@ namespace ServiceTests
                     //  we should be back where we started
                     resourcesAfterUndo = await helper.Proxy.GetResources(helper.GameName, players[0]);
                     Assert.True(resourcesAfterUndo.Equivalent(startingResources));
-
-                    //
-                    //  test redo by undoing the undo
-                    lastLogRecord = await helper.GetLogRecordsFromEnd<ResourceLog>();
-                    Assert.True(lastLogRecord.PlayerResources.Equivalent(startingResource));
-                    Assert.Equal(ServiceAction.ReturnResources, lastLogRecord.Action);
                     
-                    Assert.NotNull(lastLogRecord.UndoRequest);
-                    Assert.NotNull(lastLogRecord.UndoRequest.Body);
-                    Assert.Equal(BodyType.TradeResources, lastLogRecord.UndoRequest.BodyType);
+                    
                     //
                     // undo the request
-                    var resourcesAfterRedo = await helper.Proxy.PostUndoRequest<PlayerResources>(lastLogRecord.UndoRequest);
+                    var resourcesAfterRedo = await helper.Proxy.PostUndoRequest<PlayerResources>(undoLog.UndoRequest);
                     Assert.NotNull(resourcesAfterRedo);
                     //
                     // ...and in the end we are back to the resources we granted the user
@@ -132,18 +128,19 @@ namespace ServiceTests
                     // Undo one more time to make the looping work
                     //
                     //  get the log record - it should have resources we just granted
-                    lastLogRecord = await helper.GetLogRecordsFromEnd<ResourceLog>();
-                    Assert.True(lastLogRecord.PlayerResources.Equivalent(resourcesAfterGrant));
-                    Assert.True(lastLogRecord.TradeResource.Equivalent(loopTempResourceAsk));
+                    logCollection = await helper.Proxy.Monitor(helper.GameName, players[0]);
+                    var redoLog = logCollection[^1] as ResourceLog;
+                    Assert.True(redoLog.PlayerResources.Equivalent(resourcesAfterGrant));
+                    Assert.True(redoLog.TradeResource.Equivalent(loopTempResourceAsk));
 
 
                     // make sure the Undo CatanRequest is set
-                    Assert.NotNull(lastLogRecord.UndoRequest);
-                    Assert.Equal(BodyType.TradeResources, lastLogRecord.UndoRequest.BodyType);
-                    Assert.NotNull(lastLogRecord.UndoRequest.Body);
+                    Assert.NotNull(redoLog.UndoRequest);
+                    Assert.Equal(BodyType.TradeResources, redoLog.UndoRequest.BodyType);
+                    Assert.NotNull(redoLog.UndoRequest.Body);
 
                     // use the Undo Request
-                    resourcesAfterUndo = await helper.Proxy.PostUndoRequest<PlayerResources>(lastLogRecord.UndoRequest);
+                    resourcesAfterUndo = await helper.Proxy.PostUndoRequest<PlayerResources>(redoLog.UndoRequest);
                     Assert.NotNull(resourcesAfterUndo);
                     Assert.True(resourcesAfterUndo.Equivalent(startingResources));
                 }

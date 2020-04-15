@@ -33,7 +33,7 @@ namespace ServiceTests
                 RoadBuilding = maxCards
             };
 
-
+            
 
             using (var helper = new TestHelper(gameInfo))
             {
@@ -62,6 +62,12 @@ namespace ServiceTests
                     Assert.False(resources.DevCards[i].Played);
                     Assert.Null(helper.Proxy.LastError);
                     Assert.Empty(helper.Proxy.LastErrorString);
+                    PurchaseLog purchaseLog  = await helper.MonitorGetLastRecord<PurchaseLog>(player);
+                    Assert.Equal(ServiceAction.Purchased, purchaseLog.Action);
+                    Assert.Equal(player, purchaseLog.PlayerName);
+                    Assert.Equal(Entitlement.DevCard, purchaseLog.Entitlement);
+                    Assert.Null(purchaseLog.UndoRequest);
+
                 }
 
                 Assert.Equal(0, resources.Wood);
@@ -128,6 +134,8 @@ namespace ServiceTests
                 Assert.Equal(1, resources.Sheep);
                 Assert.Null(helper.Proxy.LastError);
                 Assert.Empty(helper.Proxy.LastErrorString);
+
+                var resourceLog = await helper.MonitorGetLastRecord<ResourceLog>(player);
 
                 //
                 // try to buy when you have resources -- still get an error

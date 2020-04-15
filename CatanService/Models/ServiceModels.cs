@@ -78,7 +78,10 @@ namespace CatanSharedModels
         public string PlayerName { get; set; }
         public string RequestUrl { get; set; }
         public CatanRequest UndoRequest { get; set; } = null; // the request to undo this action
-
+        public override string ToString()
+        {
+            return $"[LogType={LogType}][Player={PlayerName}][Action={Action}][Url={RequestUrl}]";
+        }
 
     }
     public class ResourceLog : ServiceLogRecord
@@ -87,7 +90,10 @@ namespace CatanSharedModels
         public TradeResources TradeResource { get; set; } // needed for Undo
 
         public ResourceLog() { LogType = ServiceLogType.Resource; }
-
+        public override string ToString()
+        {
+            return base.ToString() + PlayerResources.ToString();
+        }
     }
 
     public class MonopolyLog : ResourceLog
@@ -95,6 +101,10 @@ namespace CatanSharedModels
         public ResourceType ResourceType { get; set; }
         public int Count { get; set; } = 0;
         public MonopolyLog() { }
+        public override string ToString()
+        {
+            return base.ToString() + $"[ResourceType={ResourceType}]";
+        }
     }
 
     public class TurnLog : ServiceLogRecord
@@ -141,6 +151,10 @@ namespace CatanSharedModels
         public Entitlement Entitlement { get; set; }
         public PlayerResources PlayerResources { get; set; }
         public PurchaseLog() { LogType = ServiceLogType.Purchase; }
+        public override string ToString()
+        {
+            return $"[Entitlement={Entitlement}]" + base.ToString();
+        }
     }
     public class GameLog : ServiceLogRecord
     {

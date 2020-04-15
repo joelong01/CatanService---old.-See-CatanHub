@@ -12,14 +12,6 @@ using System.Threading.Tasks;
 namespace Catan.Proxy
 {
 
-    public class ProxyResult<T>
-    {
-        public T Result { get; set; }
-        public string RawJson { get; set; }
-        public int ErrorCode { get; set; }
-
-    }
-
     public class CatanProxy : IDisposable
     {
 

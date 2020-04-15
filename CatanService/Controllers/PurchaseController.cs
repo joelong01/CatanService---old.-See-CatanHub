@@ -71,22 +71,22 @@ namespace CatanService.Controllers
     [ApiController]
     public class PurchaseController : ControllerBase
     {
-        [HttpPost("{gameName}/{player}/{entitlement}")]
+        [HttpPost("{gameName}/{playerName}/{entitlement}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status402PaymentRequired)]
-        public IActionResult Purchase(string gameName, string player, Entitlement entitlement)
+        public IActionResult Purchase(string gameName, string playerName, Entitlement entitlement)
         {
             var game = TSGlobal.GetGame(gameName);
             if (game == null)
             {
                 return NotFound(new CatanResult(CatanError.NoGameWithThatName) { CantanRequest = new CatanRequest() { Url = this.Request.Path, Body = null, BodyType = BodyType.None }, Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
             }
-            var playerState = game.GetPlayer(player);
+            var playerState = game.GetPlayer(playerName);
             if (playerState == null)
             {
-                return NotFound(new CatanResult(CatanError.NoPlayerWithThatName) { Request = this.Request.Path, Description = $"{player} in game {gameName} not found" });
+                return NotFound(new CatanResult(CatanError.NoPlayerWithThatName) { Request = this.Request.Path, Description = $"{playerName} in game {gameName} not found" });
 
             }
 
@@ -100,7 +100,7 @@ namespace CatanService.Controllers
             if (!valid)
             {
                 Response.StatusCode = 402;
-                return new JsonResult(new CatanResult(CatanError.NotEnoughResourcesToPurchase) { Request = this.Request.Path, Description = $"{player} does not have the resources necessary to purchase {entitlement}" });
+                return new JsonResult(new CatanResult(CatanError.NotEnoughResourcesToPurchase) { Request = this.Request.Path, Description = $"{playerName} does not have the resources necessary to purchase {entitlement}" });
             }
 
             if (entitlement == Entitlement.DevCard)
@@ -110,12 +110,27 @@ namespace CatanService.Controllers
             bool available = playerState.TSAllocateEntitlement(entitlement); // are there entitlements of this type available?
             if (!available)
             {
-                return NotFound(new CatanResult(CatanError.LimitExceeded) {  Request = this.Request.Path, Description = $"{player} has the maximum allowd of {entitlement} " });
+                return NotFound(new CatanResult(CatanError.LimitExceeded) { Request = this.Request.Path, Description = $"{playerName} has the maximum allowd of {entitlement} " });
             }
 
             playerState.TSAddEntitlement(entitlement);
             playerState.TSAdd(cost.GetNegated());
-            game.TSAddLogRecord(new PurchaseLog() { Entitlement = entitlement, Action = ServiceAction.Purchased, PlayerResources = playerState, PlayerName = player, RequestUrl = this.Request.Path });
+            game.TSAddLogRecord(new PurchaseLog()
+            {
+                Entitlement = entitlement,
+                Action = ServiceAction.Purchased,
+                PlayerResources = playerState,
+                PlayerName = playerName,
+                RequestUrl = this.Request.Path,
+                UndoRequest = new CatanRequest()
+                {
+                    Url = $"api/catan/purchase/refund/{gameName}/{playerName}/{entitlement}",
+                    Body = null,
+                    BodyType = BodyType.None
+
+                }
+            });
+
             game.TSReleaseMonitors();
             return Ok(playerState);
         }
@@ -127,44 +142,63 @@ namespace CatanService.Controllers
         /// <param name="playerName"></param>
         /// <param name="entitlement"></param>
         /// <returns></returns>
-        [HttpPost("refund/{gameName}")]
+        [HttpPost("refund/{gameName}/{playerName}/{entitlement}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public IActionResult Refund([FromBody] PurchaseLog log, string gameName)
+        public IActionResult Refund(string gameName, string playerName, Entitlement entitlement)
         {
-            if (log is null)
+            if (entitlement == Entitlement.Undefined)
             {
-                return BadRequest(new CatanResult(CatanError.BadParameter) {  Request = this.Request.Path, Description = $"{log.Entitlement} must be specified" });
+                return BadRequest(new CatanResult(CatanError.BadParameter) { Request = this.Request.Path, Description = $"{entitlement} must be specified" });
             }
-            var playerName = log.PlayerName;
+
             var game = TSGlobal.GetGame(gameName);
             if (game == null)
             {
                 return NotFound(new CatanResult(CatanError.NoGameWithThatName) { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
             }
-            var resources = game.GetPlayer(playerName);
-            if (resources == null)
+            var playerState = game.GetPlayer(playerName);
+            if (playerState == null)
             {
                 return NotFound(new CatanResult(CatanError.NoPlayerWithThatName) { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" });
 
             }
-            var cost = PurchaseHelper.GetCost(log.Entitlement);
+            var cost = PurchaseHelper.GetCost(entitlement);
             if (cost == null)
             {
-                return BadRequest(new CatanResult(CatanError.BadLogRecord) {  Request = this.Request.Path, Description = $"{log.Entitlement} must be specified" });
+                return BadRequest(new CatanResult(CatanError.BadLogRecord) { Request = this.Request.Path, Description = $"{entitlement} must be specified" });
             }
 
-            if (resources.TSRemoveEntitlement(log.Entitlement) == false)
+            if (playerState.TSRemoveEntitlement(entitlement) == false)
             {
-                return BadRequest(new CatanResult(CatanError.BadEntitlement) { Request = this.Request.Path, Description = $"{playerName} does not have a {log.Entitlement} entitlement to refund" });
+                return BadRequest(new CatanResult(CatanError.BadEntitlement) { Request = this.Request.Path, Description = $"{playerName} does not have a {entitlement} entitlement to refund" });
             }
 
+            if (playerState.TSFreeEntitlement(entitlement) == false)
+            {
+                return BadRequest(new CatanResult(CatanError.BadEntitlement) { Request = this.Request.Path, Description = $"Refunding a {entitlement} to  {playerName} would give them mroe than the max allowed."});
+            }
+            
 
-            resources.TSAdd(cost.GetNegated());
-            game.TSAddLogRecord(new PurchaseLog() { Entitlement = log.Entitlement, Action = ServiceAction.Refund, PlayerResources = resources, PlayerName = playerName, RequestUrl = this.Request.Path });
+            playerState.TSAdd(cost);
+            game.TSAddLogRecord(new PurchaseLog()
+            {
+                Entitlement = entitlement,
+                Action = ServiceAction.Refund,
+                PlayerResources = playerState,
+                PlayerName = playerName,
+                RequestUrl = Request.Path,
+                UndoRequest = new CatanRequest()
+                {
+                    Url = $"api/catan/purchase/{gameName}/{playerName}/{entitlement}",
+                    Body = null,
+                    BodyType = BodyType.None
+
+                }
+            });
             game.TSReleaseMonitors();
-            return Ok(resources);
+            return Ok(playerState);
         }
 
 
