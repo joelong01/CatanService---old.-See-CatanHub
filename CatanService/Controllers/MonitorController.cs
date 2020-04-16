@@ -1,6 +1,6 @@
 ﻿using CatanService.State;
 using System.Threading.Tasks;
-using CatanSharedModels;
+using Catan.Proxy;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;

@@ -1,4 +1,4 @@
-﻿using CatanSharedModels;
+﻿using Catan.Proxy;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -14,10 +14,21 @@ namespace CatanService.State
         public Game TSFindOrCreateGame(string gameName, GameInfo gameInfo)
         {
 
+            
+                var game = TSGetGame(gameName);
+                if (game != null) return game;
+                return TSCreateGame(gameName, gameInfo);
+           
+           
+        }
+        public Game TSCreateGame(string gameName, GameInfo gameInfo)
+        {
+          
             try
             {
                 var game = TSGetGame(gameName);
-                if (game != null) return game;
+                if (game != null) return null;
+
                 GameLock.EnterWriteLock();
                 game = new Game()
                 {
@@ -35,6 +46,7 @@ namespace CatanService.State
                 }
 
             }
+
         }
         public Game TSGetGame(string gameName)
         {
@@ -50,12 +62,24 @@ namespace CatanService.State
                 GameLock.ExitReadLock();
             }
         }
-        public IEnumerable<string> TSGetGames()
+        public IEnumerable<string> TSGetGameNames()
         {
             GameLock.EnterReadLock();
             try
             {
                 return NameToGameDictionary.Keys;
+            }
+            finally
+            {
+                GameLock.ExitReadLock();
+            }
+        }
+        public IEnumerable<Game> TSGetGames()
+        {
+            GameLock.EnterReadLock();
+            try
+            {
+                return NameToGameDictionary.Values;
             }
             finally
             {
@@ -133,8 +157,24 @@ namespace CatanService.State
         private List<string> PlayerOrder { get; set; } = new List<string>();
         private int _logSequenceNumber = 0;
 
-        
+        public ICollection<PlayerState> TSGetPlayers()
+        {
 
+            PlayerLock.EnterReadLock();
+            try
+            {
+                return PlayerDictionary.Values;
+
+            }
+            finally
+            {
+                PlayerLock.ExitReadLock();
+            }
+        }
+        public override string ToString()
+        {
+            return $"GameName:{Name} [Started={Started}] [Type={GameInfo.GameName}]";
+        }
         public string CurrentPlayer { get; private set; } = "";
 
         public Game()

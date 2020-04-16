@@ -1,6 +1,5 @@
 ﻿using Catan.Proxy;
 using CatanService;
-using CatanSharedModels;
 using Microsoft.AspNetCore.Mvc.Testing;
 using System;
 using System.Collections.Generic;
@@ -39,14 +38,15 @@ namespace ServiceTests
         private TaskCompletionSource<object> _monitorStart = new TaskCompletionSource<object>();
         public async Task<List<string>> CreateGame(bool startGame = true)
         {
+            List<string> games = await Proxy.CreateGame(GameName, GameInfo);
            
-            var response = await Proxy.Register(GameInfo, GameName, "Doug");
+            var response = await Proxy.JoinGame( GameName, "Doug");
             Assert.NotNull(response);
-            response = await Proxy.Register(GameInfo, GameName, "Max");
+            response = await Proxy.JoinGame(GameName, "Max");
             Assert.NotNull(response);
-            response = await Proxy.Register(GameInfo, GameName, "Wallace");
+            response = await Proxy.JoinGame( GameName, "Wallace");
             Assert.NotNull(response);
-            response = await Proxy.Register(GameInfo, GameName, "Joe");
+            response = await Proxy.JoinGame(GameName, "Joe");
             Assert.NotNull(response);
             if (startGame) await Proxy.StartGame(GameName);
 

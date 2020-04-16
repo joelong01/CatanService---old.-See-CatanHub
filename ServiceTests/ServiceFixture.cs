@@ -2,7 +2,6 @@
 using System.Net.Http;
 using Catan.Proxy;
 using CatanService;
-using CatanSharedModels;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
 

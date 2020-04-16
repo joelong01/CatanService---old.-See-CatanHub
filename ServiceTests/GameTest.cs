@@ -6,7 +6,6 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Catan.Proxy;
-using CatanSharedModels;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Adapter;
 using Xunit;
 
@@ -67,7 +66,7 @@ namespace ServiceTests
             {
                 var players = await helper.CreateGame(false);
                 var gameInfo = new GameInfo();
-                var resources = await helper.Proxy.Register(helper.GameInfo, helper.GameName, "Miller"); 
+                var resources = await helper.Proxy.JoinGame(helper.GameName, "Miller"); 
                 Assert.Equal("Miller", resources.PlayerName);
                 Assert.Equal(helper.GameName, resources.GameName);
 

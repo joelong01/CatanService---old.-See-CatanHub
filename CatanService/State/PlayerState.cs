@@ -1,4 +1,4 @@
-﻿using CatanSharedModels;
+﻿using Catan.Proxy;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;

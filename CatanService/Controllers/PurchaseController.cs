@@ -1,5 +1,5 @@
 ﻿using CatanService.State;
-using CatanSharedModels;
+using Catan.Proxy;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 

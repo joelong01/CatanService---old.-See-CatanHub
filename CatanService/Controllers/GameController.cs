@@ -1,10 +1,10 @@
 ﻿using CatanService.State;
-using CatanSharedModels;
+using Catan.Proxy;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
-
+using System;
 
 namespace CatanService.Controllers
 {
@@ -20,24 +20,51 @@ namespace CatanService.Controllers
             _logger = logger;
         }
 
-
-
-        [HttpPost("register/{gameName}/{playerName}")]
+        /// <summary>
+        ///     Create a new game by the player in the URL
+        /// </summary>
+        /// <param name="gameInfo"></param>
+        /// <param name="gameName"></param>
+        /// <param name="playerName"></param>
+        /// <returns></returns>
+        [HttpPost("create/{gameName}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public IActionResult Register([FromBody] GameInfo gameInfo, string gameName, string playerName)
+        public IActionResult CreateGame([FromBody] GameInfo gameInfo, string gameName)
         {
-            var game = TSGlobal.Games.TSFindOrCreateGame(gameName, gameInfo);
-            if (game.GameInfo != gameInfo)
+            var game = TSGlobal.Games.TSGetGame(gameName);
+            if (game != null)
             {
                 var err = new CatanResult(CatanError.BadParameter)
                 {
                     CantanRequest = new CatanRequest() { Url = this.Request.Path, Body = gameInfo, BodyType = BodyType.GameInfo },
-                    Description = $"{playerName} in Game '{gameName}' attempted to register a game with different gameInfo.",                                        
+                    Description = $" Game '{gameName}' already exists.  You can join it or delete it",
                 };
-                err.ExtendedInformation.Add(new KeyValuePair<string, object>("ExistingGameInfo", game));
+
                 return BadRequest(err);
-            
+            }
+            game = TSGlobal.Games.TSCreateGame(gameName, gameInfo);
+            TSGlobal.DumpToConsole();
+            return GetGames();
+
+        }
+
+        [HttpPost("joingame/{gameName}/{playerName}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public IActionResult JoinGame(string gameName, string playerName)
+        {
+            var game = TSGlobal.Games.TSGetGame(gameName);
+            if (game == null)
+            {
+                var err = new CatanResult(CatanError.BadParameter)
+                {
+                    CantanRequest = new CatanRequest() { Url = this.Request.Path },
+                    Description = $" Game '{gameName}' does not exist.  Create it first",
+                };
+
+                return BadRequest(err);
+
             }
 
             PlayerState clientState = game.GetPlayer(playerName);
@@ -45,7 +72,7 @@ namespace CatanService.Controllers
             {
                 var err = new CatanResult(CatanError.BadParameter)
                 {
-                    CantanRequest = new CatanRequest() { Url = this.Request.Path, Body = gameInfo, BodyType = BodyType.GameInfo },
+                    CantanRequest = new CatanRequest() { Url = this.Request.Path},
                     Description = $"{playerName} in Game '{gameName}' is already registered.",
                   
                 };
@@ -57,10 +84,11 @@ namespace CatanService.Controllers
             {
                 var err = new CatanResult(CatanError.GameAlreadStarted)
                 {
-                    CantanRequest = new CatanRequest() { Url = this.Request.Path, Body = gameInfo, BodyType = BodyType.GameInfo },
+                    CantanRequest = new CatanRequest() { Url = this.Request.Path },
                     Description = $"{playerName} attempting to join '{gameName}' that has already started",                    
                 };
                 err.ExtendedInformation.Add(new KeyValuePair<string, object>("ExistingGameInfo", clientState));
+                Console.WriteLine($"{playerName} joined GameName={gameName} ");
                 return BadRequest(err);
             }
 
@@ -70,13 +98,13 @@ namespace CatanService.Controllers
                 GameName = gameName,
                 ResourcesLeft = new GameInfo(game.GameInfo) 
             };
-
+            Console.WriteLine($"{playerName} joined game {gameName}");
             game.TSSetPlayerResources( playerName, clientState);
-           
+
             //
             // do not add a Log record -- the client gets the list of players when one of them calls Start
 
-
+            TSGlobal.DumpToConsole();
             return Ok(clientState);
 
         }
@@ -100,6 +128,7 @@ namespace CatanService.Controllers
             game.TSAddLogRecord(new GameLog() { Players = game.Players, PlayerName = "", Action = ServiceAction.GameStarted, RequestUrl = this.Request.Path });
 
             game.TSReleaseMonitors();
+            TSGlobal.DumpToConsole();
             return Ok();
         }
 
@@ -160,6 +189,8 @@ namespace CatanService.Controllers
 
             game.TSAddLogRecord(new GameLog() { Players = game.Players, Action = ServiceAction.GameDeleted, RequestUrl = this.Request.Path });
             game.TSReleaseMonitors();
+            Console.WriteLine($"Deleted game {gameName}");
+            TSGlobal.DumpToConsole();
             return Ok(new CatanResult(CatanError.NoError)
             {
                 Request = this.Request.Path, Description = $"{gameName} deleted"
@@ -188,7 +219,7 @@ namespace CatanService.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult GetGames()
         {
-            var games = TSGlobal.Games.TSGetGames();
+            var games = TSGlobal.Games.TSGetGameNames();
             return Ok(games);
 
         }
