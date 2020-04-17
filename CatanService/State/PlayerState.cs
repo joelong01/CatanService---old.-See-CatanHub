@@ -116,10 +116,10 @@ namespace CatanService.State
                 ResourceLock.ExitReadLock();
             }
         }
-
+         
         public async Task<ServiceLogCollection> TSWaitForLog()
         {
-            Console.WriteLine($"Waiting for log for {PlayerName}");
+         //   Console.WriteLine($"Waiting for log for {PlayerName}");
             ServiceLogCollection logCollection = null;
             try
             {

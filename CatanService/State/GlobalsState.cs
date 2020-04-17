@@ -58,6 +58,7 @@ namespace CatanService
 
         public static void DumpToConsole()
         {
+
             StringBuilder sb = new StringBuilder();
             sb.Append(DateTime.Now.ToString("MM/dd/yyyy HH:mm:ss"));
             sb.Append(Environment.NewLine);
@@ -66,21 +67,20 @@ namespace CatanService
 
             foreach (var gameName in TSGlobal.Games.TSGetGameNames())
             {
-                sb.Append($"{gameName}: ");                
+                Game game = TSGlobal.GetGame(gameName);
+                string json = CatanProxy.Serialize(game, true);
+                sb.Append($"{gameName}:");
                 sb.Append(Environment.NewLine);
-                if (string.IsNullOrEmpty(gameName))
-                {
-                    continue;
-                }
-                var players = GetGame(gameName).TSGetPlayers();
-                foreach(var player in players)
-                {
-                    sb.Append("\t\t");
-                    sb.Append(player.PlayerName);
-                    sb.Append(":\t");
-                    sb.Append(player);
-                    sb.Append(Environment.NewLine);                    
-                }
+                sb.Append(json);
+                //var players = GetGame(gameName).TSGetPlayers();
+                //foreach (var player in players)
+                //{
+                //    sb.Append("\t\t");
+                //    sb.Append(player.PlayerName);
+                //    sb.Append(":\t");
+                //    sb.Append(player);
+                //    sb.Append(Environment.NewLine);
+                //}
             }
             Console.Clear();
             Console.WriteLine(sb.ToString());
