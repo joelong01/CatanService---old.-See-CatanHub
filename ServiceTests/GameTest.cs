@@ -8,26 +8,27 @@ using System.Threading.Tasks;
 using Catan.Proxy;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Adapter;
 using Xunit;
-
+using Xunit.Abstractions;
 
 namespace ServiceTests
 {
 
-    public class GameTest : IClassFixture<ServiceFixture>
+    public class GameTest 
     {
-        private readonly ServiceFixture _fixture;
+        
+        private readonly ITestOutputHelper output;
 
-        public GameTest(ServiceFixture fixture)
+        public GameTest(ITestOutputHelper output)
         {
-            _fixture = fixture;
+            this.output = output;
         }
-
+        
 
 
         [Fact]
         async Task VerifyGame()
         {
-            TestHelper helper = new TestHelper();
+            TestHelper helper = new TestHelper(output);
             using (helper)
             {
                 _ = await helper.CreateGame();
@@ -60,26 +61,26 @@ namespace ServiceTests
         [Fact]
         async Task CatanRegisterReturnsSuccess()
         {
-            TestHelper helper = new TestHelper();
-            Debug.WriteLine($"main thread id = {Thread.CurrentThread.ManagedThreadId}");
+            TestHelper helper = new TestHelper(output, null);
             using (helper)
             {
                 var players = await helper.CreateGame(false);
                 var gameInfo = new GameInfo();
-                var resources = await helper.Proxy.JoinGame(helper.GameName, "Miller"); 
+                var resources = await helper.Proxy.JoinGame(helper.GameName, "Miller");
+                if (resources is null ) helper.TraceMessage($"{helper.Proxy.LastError.Description}");
                 Assert.Equal("Miller", resources.PlayerName);
                 Assert.Equal(helper.GameName, resources.GameName);
 
 
-             //   await helper.StartMonitoring(1);
-                
+                //   await helper.StartMonitoring(1);
+
                 await helper.Proxy.StartGame(helper.GameName);
                 List<ServiceLogRecord> logCollection = await helper.Proxy.Monitor(helper.GameName, players[0]);
                 GameLog gameLog = logCollection[^1] as GameLog;
                 Assert.Equal(ServiceAction.GameStarted, gameLog.Action);
                 Assert.Equal(5, gameLog.Players.Count);
 
-                
+
 
                 //await helper.WaitForMonitorCompletion();
                 //Assert.Single(helper.LogCollection);
@@ -93,7 +94,7 @@ namespace ServiceTests
         [Fact]
         async Task CatanGetUsers()
         {
-            TestHelper helper = new TestHelper();
+            TestHelper helper = new TestHelper(output);
             using (helper)
             {
                 var users = await helper.CreateGame();
@@ -107,7 +108,7 @@ namespace ServiceTests
         [Fact]
         async Task CatanGetGameInfo()
         {
-            TestHelper helper = new TestHelper();
+            TestHelper helper = new TestHelper(output);
             using (helper)
             {
                 var users = await helper.CreateGame();

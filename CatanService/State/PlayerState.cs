@@ -145,7 +145,7 @@ namespace CatanService.State
             }
             finally
             {
-                Debug.WriteLine($"returning log for {PlayerName} returning {logCollection?.Count} records ");
+               // Debug.WriteLine($"returning log for {PlayerName} returning {logCollection?.Count} records ");
             }
 
         }
@@ -184,7 +184,7 @@ namespace CatanService.State
                 {
                     TCSLock.ExitWriteLock();
                 }
-                Debug.WriteLine($"Released log for {PlayerName}");
+                //Debug.WriteLine($"Released log for {PlayerName}");
             }
 
         }
@@ -344,7 +344,7 @@ namespace CatanService.State
             {
                 _log.Add(logEntry);
                 _permLog.Add(logEntry);
-                Debug.WriteLine($"Added log for {PlayerName}. [LogId={((ServiceLogRecord)logEntry).LogId}] LogCount = {_log.Count}. LogType={((ServiceLogRecord)logEntry).LogType}");
+               // Debug.WriteLine($"Added log for {PlayerName}. [LogId={((ServiceLogRecord)logEntry).LogId}] LogCount = {_log.Count}. LogType={((ServiceLogRecord)logEntry).LogType}");
             }
             finally
             {

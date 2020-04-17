@@ -6,18 +6,17 @@ using Catan.Proxy;
 using CatanService;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace ServiceTests
 {
-    public class DevCardTests : IClassFixture<ServiceFixture>
+    public class DevCardTests
     {
-        private readonly ServiceFixture _fixture;
+        private readonly ITestOutputHelper output;
 
-
-        public DevCardTests(ServiceFixture fixture)
+        public DevCardTests(ITestOutputHelper output)
         {
-            _fixture = fixture;
-
+            this.output = output;
         }
         [Fact]
         async Task DevCardPurchase()

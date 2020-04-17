@@ -7,16 +7,17 @@ using Catan.Proxy;
 using CatanService;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace ServiceTests
 {
-    public class ResourceTests : IClassFixture<ServiceFixture>
+    public class ResourceTests 
     {
-        private readonly ServiceFixture _fixture;
-        public ResourceTests(ServiceFixture fixture)
-        {
-            _fixture = fixture;
+        private readonly ITestOutputHelper output;
 
+        public ResourceTests(ITestOutputHelper output)
+        {
+            this.output = output;
         }
         [Fact]
         public async Task GrantResources()

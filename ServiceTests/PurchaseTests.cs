@@ -7,12 +7,20 @@ using Catan.Proxy;
 using CatanService;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
-
+using Xunit.Abstractions;
 
 namespace ServiceTests
 {
-    public class PurchaseTests : IClassFixture<ServiceFixture>
+    public class PurchaseTests
     {
+        private readonly ITestOutputHelper output;
+
+        public PurchaseTests(ITestOutputHelper output)
+        {
+            this.output = output;
+        }
+        
+    
         [Fact]
         private async Task PurchaseRoads()
         {
@@ -101,14 +109,14 @@ namespace ServiceTests
             //
             //  now undo everything
             PlayerResources resourcesAfterUndo = null;
-            for (int i = 0; i < logCollection.Count ; i++) 
+            for (int i = 0; i < logCollection.Count; i++)
             {
-                ServiceLogRecord logEntry = logCollection[^(i+1)] as ServiceLogRecord;
+                ServiceLogRecord logEntry = logCollection[^(i + 1)] as ServiceLogRecord;
                 Assert.NotNull(logEntry);
                 Assert.NotNull(logEntry.UndoRequest);
                 Assert.NotNull(logEntry.UndoRequest.Url);
                 resourcesAfterUndo = await helper.Proxy.PostUndoRequest<PlayerResources>(logEntry.UndoRequest);
-                if (resourcesAfterUndo is  null)
+                if (resourcesAfterUndo is null)
                 {
                     Debug.WriteLine($"Last Error: {helper.Proxy.LastErrorString}");
                 }
@@ -135,7 +143,7 @@ namespace ServiceTests
                 Assert.NotNull(logEntry.UndoRequest.Url);
                 resourcesAfterRedo = await helper.Proxy.PostUndoRequest<PlayerResources>(logEntry.UndoRequest);
                 Assert.NotNull(resourcesAfterUndo);
-                Debug.WriteLine($"{i}: {logEntry.UndoRequest.Url} ");
+
             }
 
             //

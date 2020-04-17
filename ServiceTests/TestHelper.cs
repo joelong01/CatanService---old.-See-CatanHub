@@ -4,9 +4,12 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace ServiceTests
 {
@@ -17,14 +20,19 @@ namespace ServiceTests
         public GameInfo GameInfo { get; set; } = new GameInfo();
         public List<string> Players { get; set; }
         public List<List<ServiceLogRecord>> LogCollection { get; } = new List<List<ServiceLogRecord>>();
-        public TestHelper() : this(null)
+        ITestOutputHelper Output { get; set; }
+        public TestHelper() : this(null, new GameInfo())
         {
             
         }
-        public TestHelper(GameInfo gameInfo) : base()
+
+        public TestHelper(GameInfo gameInfo) : this(null, gameInfo) { }
+
+        
+        public TestHelper(ITestOutputHelper output = null, GameInfo gameInfo = null) 
         {
             if (!(gameInfo is null)) GameInfo = gameInfo;
-
+            
             GameName = Guid.NewGuid().ToString();
             Proxy = new CatanProxy();
             var factory = new CustomWebApplicationFactory<Startup>();
@@ -33,18 +41,40 @@ namespace ServiceTests
                 AllowAutoRedirect = false
             });
         }
+
+        public void TraceMessage(string toWrite, [CallerMemberName] string cmb = "", [CallerLineNumber] int cln = 0, [CallerFilePath] string cfp = "")
+        {
+            if (Output != null)
+            {
+                Output.WriteLine($"{cfp}({cln}):{toWrite}\t\t[Caller={cmb}]");
+            }
+
+
+        }
+        private void TraceObject(object o, [CallerMemberName] string cmb = "", [CallerLineNumber] int cln = 0, [CallerFilePath] string cfp = "")
+        {
+            if (o is null)
+            {
+                TraceMessage("Null object value", cmb, cln, cfp);
+            }
+            else
+            {
+                TraceMessage(JsonSerializer.Serialize<object>(o), cmb, cln, cfp);
+            }
+        }
+
         private int _monitorIterations = 1;
         private TaskCompletionSource<object> _monitorTCS = new TaskCompletionSource<object>();
         private TaskCompletionSource<object> _monitorStart = new TaskCompletionSource<object>();
         public async Task<List<string>> CreateGame(bool startGame = true)
         {
             List<string> games = await Proxy.CreateGame(GameName, GameInfo);
-           
-            var response = await Proxy.JoinGame( GameName, "Doug");
+
+            var response = await Proxy.JoinGame(GameName, "Doug");
             Assert.NotNull(response);
             response = await Proxy.JoinGame(GameName, "Max");
             Assert.NotNull(response);
-            response = await Proxy.JoinGame( GameName, "Wallace");
+            response = await Proxy.JoinGame(GameName, "Wallace");
             Assert.NotNull(response);
             response = await Proxy.JoinGame(GameName, "Joe");
             Assert.NotNull(response);
@@ -71,7 +101,7 @@ namespace ServiceTests
 
         private async void Monitor_Callback(object state)
         {
-            Debug.WriteLine($"Monitor_Callback started. iterating {_monitorIterations} thread id = {Thread.CurrentThread.ManagedThreadId} ");
+            // Debug.WriteLine($"Monitor_Callback started. iterating {_monitorIterations} thread id = {Thread.CurrentThread.ManagedThreadId} ");
 
             List<ServiceLogRecord> logs;
             int count = 0;
@@ -83,12 +113,12 @@ namespace ServiceTests
                 count++;
                 if (logs != null)
                 {
-                    Debug.WriteLine($"Monitor returned with {logs.Count} records");
+                    // Debug.WriteLine($"Monitor returned with {logs.Count} records");
                     LogCollection.Add(logs);
                 }
                 else
                 {
-                    Debug.WriteLine($"Monitor returned with Zero records!!");
+                    // Debug.WriteLine($"Monitor returned with Zero records!!");
                 }
 
 
@@ -96,7 +126,7 @@ namespace ServiceTests
             if (count == _monitorIterations)
             {
                 _monitorTCS.SetResult(null);
-                Debug.WriteLine("Exiting worker thread");
+                // Debug.WriteLine("Exiting worker thread");
             }
         }
         public async Task<T> GetLogRecordsFromEnd<T>(int offset = 1)
@@ -104,7 +134,7 @@ namespace ServiceTests
             List<ServiceLogRecord> logCollection = await Proxy.GetAllLogs(GameName, Players[0], offset);
             if (logCollection == null)
             {
-                Debug.WriteLine($"LogCollection is null! {this.Proxy.LastError} {this.Proxy.LastErrorString}");
+                // Debug.WriteLine($"LogCollection is null! {this.Proxy.LastError} {this.Proxy.LastErrorString}");
             }
             Assert.NotNull(logCollection);
             Assert.NotEmpty(logCollection);
@@ -117,7 +147,7 @@ namespace ServiceTests
             }
             catch (InvalidCastException)
             {
-                Debug.WriteLine($"Invalid Cast in GetLogRecordsFromEnd.  Wanted type {typeof(T).UnderlyingSystemType} got {logCollection[^offset].GetType().UnderlyingSystemType}");
+                // Debug.WriteLine($"Invalid Cast in GetLogRecordsFromEnd.  Wanted type {typeof(T).UnderlyingSystemType} got {logCollection[^offset].GetType().UnderlyingSystemType}");
             }
 
             return default;
@@ -205,7 +235,7 @@ namespace ServiceTests
 
         public void Dispose()
         {
-            
+
             var result = Proxy.DeleteGame(GameName).Result;
             Assert.NotNull(result);
             Assert.Equal(CatanError.NoError, result.Error);
