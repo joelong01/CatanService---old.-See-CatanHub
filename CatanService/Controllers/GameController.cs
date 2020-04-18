@@ -103,7 +103,7 @@ namespace CatanService.Controllers
                         Description = $"{playerName} attempting to join '{gameName}' that has already started",
                     };
                     err.ExtendedInformation.Add(new KeyValuePair<string, object>("ExistingGameInfo", clientState));
-                    Console.WriteLine($"{playerName} joined GameName={gameName} ");
+                   // Console.WriteLine($"{playerName} joined GameName={gameName} ");
                     return BadRequest(err);
                 }
 
@@ -113,7 +113,7 @@ namespace CatanService.Controllers
                     GameName = gameName,
                     ResourcesLeft = new GameInfo(game.GameInfo)
                 };
-                Console.WriteLine($"{playerName} joined game {gameName}");
+                //Console.WriteLine($"{playerName} joined game {gameName}");
                 game.TSSetPlayerResources(playerName, clientState);
 
                 //
@@ -257,7 +257,7 @@ namespace CatanService.Controllers
 
                 game.TSAddLogRecord(new GameLog() { Players = game.Players, Action = ServiceAction.GameDeleted, RequestUrl = this.Request.Path });
                 game.TSReleaseMonitors();
-                Console.WriteLine($"Deleted game {gameName}");
+                //Console.WriteLine($"Deleted game {gameName}");
                 TSGlobal.DumpToConsole();
                 return Ok(new CatanResult(CatanError.NoError)
                 {

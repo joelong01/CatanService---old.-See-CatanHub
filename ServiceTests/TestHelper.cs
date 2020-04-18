@@ -23,16 +23,16 @@ namespace ServiceTests
         ITestOutputHelper Output { get; set; }
         public TestHelper() : this(null, new GameInfo())
         {
-            
+
         }
 
         public TestHelper(GameInfo gameInfo) : this(null, gameInfo) { }
 
-        
-        public TestHelper(ITestOutputHelper output = null, GameInfo gameInfo = null) 
+
+        public TestHelper(ITestOutputHelper output = null, GameInfo gameInfo = null)
         {
             if (!(gameInfo is null)) GameInfo = gameInfo;
-            
+
             GameName = Guid.NewGuid().ToString();
             Proxy = new CatanProxy();
             var factory = new CustomWebApplicationFactory<Startup>();
@@ -68,16 +68,40 @@ namespace ServiceTests
         private TaskCompletionSource<object> _monitorStart = new TaskCompletionSource<object>();
         public async Task<List<string>> CreateGame(bool startGame = true)
         {
+            CatanResult result = await Proxy.DeleteGame(GameName);
+            if (result is null)
+            {
+
+                Assert.Equal("", Proxy.LastErrorString);
+
+            }
+            if (result.Error != CatanError.NoError)
+            {
+                Assert.Equal("", Proxy.LastErrorString);
+            }
+
             List<string> games = await Proxy.CreateGame(GameName, GameInfo);
 
             var response = await Proxy.JoinGame(GameName, "Doug");
-            Assert.NotNull(response);
+            if (response is null)
+            {
+                Assert.Equal("", Proxy.LastErrorString);
+            }
             response = await Proxy.JoinGame(GameName, "Max");
-            Assert.NotNull(response);
+            if (response is null)
+            {
+                Assert.Equal("", Proxy.LastErrorString);
+            }
             response = await Proxy.JoinGame(GameName, "Wallace");
-            Assert.NotNull(response);
+            if (response is null)
+            {
+                Assert.Equal("", Proxy.LastErrorString);
+            }
             response = await Proxy.JoinGame(GameName, "Joe");
-            Assert.NotNull(response);
+            if (response is null)
+            {
+                Assert.Equal("", Proxy.LastErrorString);
+            }
             if (startGame) await Proxy.StartGame(GameName);
 
             Players = await Proxy.GetUsers(GameName);
@@ -167,7 +191,7 @@ namespace ServiceTests
             return ret;
         }
 
-      
+
         public async Task<PurchaseLog> GetAndValidatePurchaseLog(string player)
         {
             var purchaseLog = await MonitorGetLastRecord<PurchaseLog>(player);
@@ -237,7 +261,10 @@ namespace ServiceTests
         {
 
             var result = Proxy.DeleteGame(GameName).Result;
-            Assert.NotNull(result);
+            if (result is null)
+            {
+                Assert.Equal("", Proxy.LastError.Description);
+            }
             Assert.Equal(CatanError.NoError, result.Error);
             Proxy.Dispose();
         }

@@ -82,8 +82,10 @@ namespace CatanService
                 //    sb.Append(Environment.NewLine);
                 //}
             }
+#if __DEBUG__
             Console.Clear();
             Console.WriteLine(sb.ToString());
+#endif
 
         }
 
