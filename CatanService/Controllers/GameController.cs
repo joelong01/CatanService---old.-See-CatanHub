@@ -277,7 +277,33 @@ namespace CatanService.Controllers
             }
         }
 
+        [HttpDelete("all")]
+        [Produces("application/json")]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public IActionResult DeleteAll()
+        {
+            try
+            {
+                TSGlobal.Games = new Games();
+                TSGlobal.DumpToConsole();
+                return Ok(new CatanResult(CatanError.NoError)
+                {
+                    Request = this.Request.Path,
+                    Description = $"all games deleted"
+                });
+            }
+            catch (Exception e)
+            {
+                var err = new CatanResult(CatanError.BadParameter)
+                {
+                    CantanRequest = new CatanRequest() { Url = this.Request.Path },
+                    Description = $"{this.Request.Path} threw an exception. {e}",
+                };
 
+                return BadRequest(err);
+            }
+        }
 
         [HttpGet("users/{gameName}")]
         [Produces("application/json")]
@@ -391,7 +417,7 @@ namespace CatanService.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         public IActionResult GetHelp()
         {
-            return Ok(new CatanResult(CatanError.NoError) { Request = this.Request.Path, Description = "You have landed on the Catan Service Help page!" });
+           return Ok(new CatanResult(CatanError.NoError) { Request = this.Request.Path, Description = $"You have landed on the Catan Service Help page!" });
         }
 
 

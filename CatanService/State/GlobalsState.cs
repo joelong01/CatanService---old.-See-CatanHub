@@ -40,7 +40,7 @@ namespace CatanService
     /// </summary>
     public static class TSGlobal
     {
-        public static Games Games { get; } = new Games();
+        public static Games Games { get; set; } = new Games();
         public static Game GetGame(string gameName) { return Games.TSGetGame(gameName); }
 
         public static (Game, PlayerResources) GetGameAndPlayerInfo(string gameName, string playerName)
