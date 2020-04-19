@@ -14,16 +14,16 @@ namespace CatanService.State
         public Game TSFindOrCreateGame(string gameName, GameInfo gameInfo)
         {
 
-            
-                var game = TSGetGame(gameName);
-                if (game != null) return game;
-                return TSCreateGame(gameName, gameInfo);
-           
-           
+
+            var game = TSGetGame(gameName);
+            if (game != null) return game;
+            return TSCreateGame(gameName, gameInfo);
+
+
         }
         public Game TSCreateGame(string gameName, GameInfo gameInfo)
         {
-          
+
             try
             {
                 var game = TSGetGame(gameName);
@@ -32,7 +32,8 @@ namespace CatanService.State
                 GameLock.EnterWriteLock();
                 game = new Game()
                 {
-                    GameInfo = gameInfo
+                    GameInfo = gameInfo,
+                    Name = gameName
                 };
 
                 NameToGameDictionary[gameName.ToLower()] = game;
@@ -89,6 +90,7 @@ namespace CatanService.State
 
         public bool TSDeleteGame(string gameName)
         {
+            if (gameName == null) return false;
             gameName = gameName.ToLower();
 
             GameLock.EnterWriteLock();

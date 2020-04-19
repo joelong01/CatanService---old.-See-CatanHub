@@ -277,7 +277,7 @@ namespace CatanService.Controllers
             }
         }
 
-        [HttpDelete("all")]
+        [HttpDelete("alltestgames")]
         [Produces("application/json")]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status200OK)]
@@ -285,12 +285,24 @@ namespace CatanService.Controllers
         {
             try
             {
-                TSGlobal.Games = new Games();
+                List<string> gamesToRemove = new List<string>();
+                foreach (var game in TSGlobal.Games.TSGetGames())
+                {
+                    if (game.GameInfo.GameType == GameType.Test)
+                    {
+                        gamesToRemove.Add(game.Name);
+                    }
+                }
+                foreach (var game in gamesToRemove)
+                {
+                    TSGlobal.Games.TSDeleteGame(game);
+                }
+                
                 TSGlobal.DumpToConsole();
                 return Ok(new CatanResult(CatanError.NoError)
                 {
                     Request = this.Request.Path,
-                    Description = $"all games deleted"
+                    Description = $"this games deleted: {CatanProxy.Serialize(gamesToRemove)}"
                 });
             }
             catch (Exception e)

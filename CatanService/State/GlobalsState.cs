@@ -56,36 +56,36 @@ namespace CatanService
 
         }
 
-        public static void DumpToConsole()
+        public static void DumpToConsole()        
         {
 
-            StringBuilder sb = new StringBuilder();
-            sb.Append(DateTime.Now.ToString("MM/dd/yyyy HH:mm:ss"));
-            sb.Append(Environment.NewLine);
-            sb.Append("-------------------");
-            sb.Append(Environment.NewLine);
+//            StringBuilder sb = new StringBuilder();
+//            sb.Append(DateTime.Now.ToString("MM/dd/yyyy HH:mm:ss"));
+//            sb.Append(Environment.NewLine);
+//            sb.Append("-------------------");
+//            sb.Append(Environment.NewLine);
 
-            foreach (var gameName in TSGlobal.Games.TSGetGameNames())
-            {
-                Game game = TSGlobal.GetGame(gameName);
-                string json = CatanProxy.Serialize(game, true);
-                sb.Append($"{gameName}:");
-                sb.Append(Environment.NewLine);
-                sb.Append(json);
-                //var players = GetGame(gameName).TSGetPlayers();
-                //foreach (var player in players)
-                //{
-                //    sb.Append("\t\t");
-                //    sb.Append(player.PlayerName);
-                //    sb.Append(":\t");
-                //    sb.Append(player);
-                //    sb.Append(Environment.NewLine);
-                //}
-            }
-#if __DEBUG__
-            Console.Clear();
-            Console.WriteLine(sb.ToString());
-#endif
+//            foreach (var gameName in TSGlobal.Games.TSGetGameNames())
+//            {
+//                Game game = TSGlobal.GetGame(gameName);
+//                string json = CatanProxy.Serialize(game, true);
+//                sb.Append($"{gameName}:");
+//                sb.Append(Environment.NewLine);
+//                sb.Append(json);
+//                //var players = GetGame(gameName).TSGetPlayers();
+//                //foreach (var player in players)
+//                //{
+//                //    sb.Append("\t\t");
+//                //    sb.Append(player.PlayerName);
+//                //    sb.Append(":\t");
+//                //    sb.Append(player);
+//                //    sb.Append(Environment.NewLine);
+//                //}
+//            }
+//#if __DEBUG__
+//            Console.Clear();
+//            Console.WriteLine(sb.ToString());
+//#endif
 
         }
 
