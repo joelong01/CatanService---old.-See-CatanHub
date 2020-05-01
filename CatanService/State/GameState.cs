@@ -1,6 +1,9 @@
 ﻿using Catan.Proxy;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Diagnostics.Contracts;
 using System.Threading;
 
 
@@ -9,8 +12,8 @@ namespace CatanService.State
 
     public class Games
     {
-        private Dictionary<string, Game> NameToGameDictionary { get; } = new Dictionary<string, Game>();
-        private ReaderWriterLockSlim GameLock { get; } = new ReaderWriterLockSlim();
+        private ConcurrentDictionary<string, Game> NameToGameDictionary { get; } = new ConcurrentDictionary<string, Game>();
+
         public Game TSFindOrCreateGame(string gameName, GameInfo gameInfo)
         {
 
@@ -23,92 +26,57 @@ namespace CatanService.State
         }
         public Game TSCreateGame(string gameName, GameInfo gameInfo)
         {
+            var game = TSGetGame(gameName);
+            if (game != null) return null;
 
-            try
+            game = new Game()
             {
-                var game = TSGetGame(gameName);
-                if (game != null) return null;
+                GameInfo = gameInfo,
+                Name = gameName
+            };
 
-                GameLock.EnterWriteLock();
-                game = new Game()
-                {
-                    GameInfo = gameInfo,
-                    Name = gameName
-                };
+            NameToGameDictionary[gameName.ToLower()] = game;
+            return game;
 
-                NameToGameDictionary[gameName.ToLower()] = game;
-                return game;
-            }
-            finally
-            {
-                if (GameLock.IsWriteLockHeld)
-                {
-                    GameLock.ExitWriteLock();
-                }
 
-            }
 
         }
         public Game TSGetGame(string gameName)
         {
-            GameLock.EnterReadLock();
-            try
-            {
-                string name = gameName.ToLower();
-                bool ret = NameToGameDictionary.TryGetValue(name, out Game game);
-                return game;
-            }
-            finally
-            {
-                GameLock.ExitReadLock();
-            }
+            string name = gameName.ToLower();
+            var _ = NameToGameDictionary.TryGetValue(name, out Game game);
+            return game;
+
         }
         public IEnumerable<string> TSGetGameNames()
         {
-            GameLock.EnterReadLock();
-            try
-            {
-                return NameToGameDictionary.Keys;
-            }
-            finally
-            {
-                GameLock.ExitReadLock();
-            }
+
+            return NameToGameDictionary.Keys;
+
         }
         public IEnumerable<Game> TSGetGames()
         {
-            GameLock.EnterReadLock();
-            try
-            {
-                return NameToGameDictionary.Values;
-            }
-            finally
-            {
-                GameLock.ExitReadLock();
-            }
+
+            return NameToGameDictionary.Values;
+
         }
 
         public bool TSDeleteGame(string gameName)
         {
-            if (gameName == null) return false;
-            gameName = gameName.ToLower();
+            bool ret = NameToGameDictionary.TryRemove(gameName.ToLower(), out Game game);
+            if (game != null)
+            {
+                game.Dispose();                
+            }
+            return ret;
 
-            GameLock.EnterWriteLock();
-            try
-            {
-                return NameToGameDictionary.Remove(gameName);
-            }
-            finally
-            {
-                GameLock.ExitWriteLock();
-            }
         }
     }
 
     /// <summary>
     ///     this contains all the state about players in a particular game
     /// </summary>
-    public class Game
+    public class Game : IDisposable
     {
         private GameInfo _gameInfo = new GameInfo() { Knight = 0 };// this will force operator == to false w/o causing an exception
         public GameInfo GameInfo
@@ -116,6 +84,8 @@ namespace CatanService.State
             get => _gameInfo;
             set
             {
+                //
+                //  The DevCard List has to be populated with the right number of DevCards
                 if (value != _gameInfo)
                 {
                     _devCards.Clear();
@@ -152,32 +122,33 @@ namespace CatanService.State
         public string Name { get; set; }
 
         private object _devCardLock = new object();
-        private readonly List<DevCardType> _devCards = new List<DevCardType>();
+        private readonly ConcurrentBag<DevCardType> _devCards = new ConcurrentBag<DevCardType> ();
         private Random _rand = new Random((int)DateTime.Now.Ticks);
-        private ReaderWriterLockSlim PlayerLock { get; } = new ReaderWriterLockSlim();
-        private Dictionary<string, PlayerState> PlayerDictionary { get; } = new Dictionary<string, PlayerState>();
-        private List<string> PlayerOrder { get; set; } = new List<string>();
-        private int _logSequenceNumber = 0;
+        private ConcurrentDictionary<string, PlayerState> PlayerDictionary { get; } = new ConcurrentDictionary<string, PlayerState>();
+        private ConcurrentDictionary<int, string> PlayerOrderDictionary { get; set; } = new ConcurrentDictionary<int, string>();
+        public int CurrentPlayerIndex { get; private set; } = 0;
 
+        public void Dispose()
+        {
+            foreach (var kvp in PlayerDictionary)
+            {
+                kvp.Value.Dispose();
+            }
+
+            PlayerDictionary.Clear();
+            PlayerOrderDictionary.Clear();
+        }
         public ICollection<PlayerState> TSGetPlayers()
         {
 
-            PlayerLock.EnterReadLock();
-            try
-            {
-                return PlayerDictionary.Values;
+            return PlayerDictionary.Values;
 
-            }
-            finally
-            {
-                PlayerLock.ExitReadLock();
-            }
         }
         public override string ToString()
         {
             return $"GameName:{Name} [Started={Started}] [Type={GameInfo.GameName}]";
         }
-        public string CurrentPlayer { get; private set; } = "";
+        
 
         public Game()
         {
@@ -219,18 +190,10 @@ namespace CatanService.State
 
             var player = playerName.ToLower();
 
-            PlayerLock.EnterReadLock();
-            try
-            {
-                playerState = null;
-                bool ret = PlayerDictionary.TryGetValue(player.ToLower(), out playerState);
-                return ret;
+            playerState = null;
+            bool ret = PlayerDictionary.TryGetValue(player.ToLower(), out playerState);
+            return ret;
 
-            }
-            finally
-            {
-                PlayerLock.ExitReadLock();
-            }
         }
         public PlayerState GetPlayer(string playerName)
         {
@@ -240,19 +203,9 @@ namespace CatanService.State
 
         public DevCardType TSGetDevCard()
         {
+            _devCards.TryTake(out DevCardType ret);
+            return ret;
 
-            lock (_devCardLock)
-            {
-                if (_devCards.Count == 0)
-                {
-                    return DevCardType.Unknown;
-                }
-
-                int index = _rand.Next(_devCards.Count - 1);
-                var ret = _devCards[index];
-                _devCards.RemoveAt(index);
-                return ret;
-            }
         }
         /// <summary>
         ///     keeps track of how many resources the game has handed out
@@ -267,104 +220,72 @@ namespace CatanService.State
         {
 
         }
-        public int TSTakeAll(string Url, ResourceType resType)
+        public (int total, Dictionary<string, int> impactedPlayers) TSTakeAll(string Url, ResourceType resType)
         {
 
             int total = 0;
-            PlayerLock.EnterReadLock();
-            List<ServiceLogRecord> logList = new List<ServiceLogRecord>();
-            try
+
+            Dictionary<string, int> dictionary = new Dictionary<string, int>();
+
+            foreach (var kvp in PlayerDictionary)
             {
 
-                foreach (var kvp in PlayerDictionary)
+                switch (resType)
                 {
-
-                    switch (resType)
-                    {
-                        case ResourceType.Sheep:
-                            total += kvp.Value.Sheep;
-                            kvp.Value.Sheep = 0;
-                            break;
-                        case ResourceType.Wood:
-                            total += kvp.Value.Wood;
-                            kvp.Value.Wood = 0;
-                            break;
-                        case ResourceType.Ore:
-                            total += kvp.Value.Ore;
-                            kvp.Value.Ore = 0;
-                            break;
-                        case ResourceType.Wheat:
-                            total += kvp.Value.Wheat;
-                            kvp.Value.Wheat = 0;
-                            break;
-                        case ResourceType.Brick:
-                            total += kvp.Value.Brick;
-                            kvp.Value.Brick = 0;
-                            break;
-                        default:
-                            return 0;
-                    }
-
-                    if (total > 0)
-                    {
-                        logList.Add(new MonopolyLog() { PlayerResources = kvp.Value, Action = ServiceAction.LostToMonopoly, PlayerName = kvp.Value.PlayerName, Count = total, ResourceType = resType, RequestUrl = Url });
-                    }
-
-                }
-                return total; //NOTE:  We took from the player who played it, but will grant it back to them
-            }
-            finally
-            {
-                PlayerLock.ExitReadLock();
-                //
-                //  can't do this under the Read lock!
-                foreach (var o in logList)
-                {
-                    TSAddLogRecord(o);
+                    case ResourceType.Sheep:
+                        dictionary[kvp.Key] = kvp.Value.Sheep;
+                        total += kvp.Value.Sheep;
+                        kvp.Value.Sheep = 0;                        
+                        break;
+                    case ResourceType.Wood:
+                        dictionary[kvp.Key] = kvp.Value.Wood;
+                        total += kvp.Value.Wood;
+                        kvp.Value.Wood = 0;
+                        break;
+                    case ResourceType.Ore:
+                        dictionary[kvp.Key] = kvp.Value.Ore;
+                        total += kvp.Value.Ore;
+                        kvp.Value.Ore = 0;
+                        break;
+                    case ResourceType.Wheat:
+                        dictionary[kvp.Key] = kvp.Value.Wheat;
+                        total += kvp.Value.Wheat;
+                        kvp.Value.Wheat = 0;
+                        break;
+                    case ResourceType.Brick:
+                        dictionary[kvp.Key] = kvp.Value.Brick;
+                        total += kvp.Value.Brick;
+                        kvp.Value.Brick = 0;
+                        break;
+                    default:
+                        throw new ArgumentException("Unknown and unexpected resources type in TSTakeAll.");               
                 }
             }
+
+            return (total, dictionary); //NOTE:  We took from the player who played it, but will grant it back to them after this returns
+
         }
 
         public bool TSSetPlayerResources(string playerName, PlayerState clientState)
         {
-
             playerName = playerName.ToLower();
-
-            PlayerLock.EnterWriteLock();
-            try
-            {
-
-                return PlayerDictionary.TryAdd(playerName, clientState);
-
-            }
-            finally
-            {
-                PlayerLock.ExitWriteLock();
-            }
-
+            return PlayerDictionary.TryAdd(playerName, clientState);
         }
 
         /// <summary>
         ///     Adds a logRecord to every log.  Note that this is by reference, so the logRecord shoudl be read only.
         /// </summary>
         /// <param name="logRecord"></param>
-        public bool TSAddLogRecord(ServiceLogRecord logRecord)
+        public bool TSAddLogRecord(LogHeader logRecord)
         {
-            PlayerLock.EnterReadLock();
-            try
+
+            
+            foreach (var kvp in PlayerDictionary)
             {
-                logRecord.Sequence = _logSequenceNumber++;
-                foreach (var kvp in PlayerDictionary)
-                {
-                    PlayerState tracker = kvp.Value;
-                    tracker.TSAddLogRecord(logRecord);
-                }
-                return true;
+                PlayerState tracker = kvp.Value;
+                tracker.TSAddLogRecord(logRecord);
             }
-            finally
-            {
-                PlayerLock.ExitReadLock();
-            }
+            return true;
         }
         /// <summary>
         ///     Releases all the monitors
@@ -373,21 +294,13 @@ namespace CatanService.State
         /// <returns></returns>
         public bool TSReleaseMonitors()
         {
-            PlayerLock.EnterReadLock();
-            try
+            foreach (var kvp in PlayerDictionary)
             {
-
-                foreach (var kvp in PlayerDictionary)
-                {
-                    kvp.Value.TSReleaseLogToClient();
-                }
-                return true;
-
+                kvp.Value.TSReleaseLogToClient();
             }
-            finally
-            {
-                PlayerLock.ExitReadLock();
-            }
+            return true;
+
+
         }
 
         public string TSNextPlayer()
@@ -401,63 +314,41 @@ namespace CatanService.State
 
         private string SetCurrentPlayer(int n)
         {
-            PlayerLock.EnterWriteLock();
-            try
+            lock (this)
             {
-                int index = PlayerOrder.IndexOf(CurrentPlayer);
+                int index = CurrentPlayerIndex;
                 index += n;
-                if (index >= PlayerOrder.Count) index = index - PlayerOrder.Count;
-                if (index < 0) index = index + PlayerOrder.Count;
-                CurrentPlayer = PlayerOrder[index];
-                return CurrentPlayer;
+                if (index >= PlayerOrderDictionary.Count) index -= PlayerOrderDictionary.Count;
+                if (index < 0) index += PlayerOrderDictionary.Count;
+                CurrentPlayerIndex = index;
+                return PlayerOrderDictionary[CurrentPlayerIndex];
+            }
+            
 
-            }
-            finally
-            {
-                PlayerLock.ExitReadLock();
-            }
+
         }
 
         internal bool TSSetPlayerOrder(List<string> players)
         {
 
-            PlayerLock.EnterWriteLock();
-            try
+            PlayerOrderDictionary.Clear();
+            for (int i=0; i< players.Count; i++)
             {
-                foreach (var p in PlayerDictionary.Keys)
-                {
-                    if (players.Contains(p) == false)
-                    {
-                        return false;
-                    }
-                }
+                PlayerOrderDictionary[i] = players[i];
+            } 
 
-                if (PlayerDictionary.Keys.Count != players.Count) return false;
-                PlayerOrder = players;
-                return true;
-
-            }
-            finally
-            {
-                PlayerLock.ExitReadLock();
-            }
+            return true;
 
         }
+
+       
 
         public ICollection<string> Players
         {
             get
             {
-                PlayerLock.EnterReadLock();
-                try
-                {
-                    return PlayerDictionary.Keys;
+               return PlayerDictionary.Keys;
 
-                }
-                finally
-                {
-                    PlayerLock.ExitReadLock();
-                }
             }
         }
 

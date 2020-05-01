@@ -118,7 +118,7 @@ namespace CatanService.Controllers
             game.TSAddLogRecord(new PurchaseLog()
             {
                 Entitlement = entitlement,
-                Action = ServiceAction.Purchased,
+                Action = CatanAction.Purchased,
                 PlayerResources = playerState,
                 PlayerName = playerName,
                 RequestUrl = this.Request.Path,
@@ -184,8 +184,9 @@ namespace CatanService.Controllers
             playerState.TSAdd(cost);
             game.TSAddLogRecord(new PurchaseLog()
             {
+                LogType = LogType.Undo,
                 Entitlement = entitlement,
-                Action = ServiceAction.Refund,
+                Action = CatanAction.Purchased,
                 PlayerResources = playerState,
                 PlayerName = playerName,
                 RequestUrl = Request.Path,

@@ -85,7 +85,7 @@ namespace ServiceTests
             Assert.NotNull(player);
             Assert.NotEmpty(player);
             PlayerResources startingResources = await helper.Proxy.GetResources(helper.GameName, player);
-            List<ServiceLogRecord> logCollection = await helper.Proxy.Monitor(helper.GameName, player); // this wipes out any logs up till now -- just a player log
+            List<LogHeader> logCollection = await helper.Proxy.Monitor(helper.GameName, player); // this wipes out any logs up till now -- just a player log
 
             PlayerResources resources;
             do
@@ -111,7 +111,7 @@ namespace ServiceTests
             PlayerResources resourcesAfterUndo = null;
             for (int i = 0; i < logCollection.Count; i++)
             {
-                ServiceLogRecord logEntry = logCollection[^(i + 1)] as ServiceLogRecord;
+                LogHeader logEntry = logCollection[^(i + 1)] as LogHeader;
                 Assert.NotNull(logEntry);
                 Assert.NotNull(logEntry.UndoRequest);
                 Assert.NotNull(logEntry.UndoRequest.Url);
@@ -137,7 +137,7 @@ namespace ServiceTests
 
             for (int i = 0; i < logCollection.Count; i++)
             {
-                ServiceLogRecord logEntry = logCollection[i] as ServiceLogRecord;
+                LogHeader logEntry = logCollection[i] as LogHeader;
                 Assert.NotNull(logEntry);
                 Assert.NotNull(logEntry.UndoRequest);
                 Assert.NotNull(logEntry.UndoRequest.Url);

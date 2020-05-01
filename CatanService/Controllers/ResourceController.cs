@@ -55,7 +55,7 @@ namespace CatanService.Controllers
             game.TSAddLogRecord(new ResourceLog()
             {
                 PlayerResources = resources,
-                Action = ServiceAction.GrantResources,
+                Action = CatanAction.GrantResources,
                 PlayerName = playerName,
                 TradeResource = toAdd,
                 RequestUrl = this.Request.Path,
@@ -88,8 +88,9 @@ namespace CatanService.Controllers
 
             game.TSAddLogRecord(new ResourceLog()
             {
+                LogType = LogType.Undo,
                 PlayerResources = resources,
-                Action = ServiceAction.ReturnResources,
+                Action = CatanAction.GrantResources,
                 PlayerName = playerName,
                 TradeResource = tradeResource,
                 RequestUrl = this.Request.Path,
@@ -162,8 +163,9 @@ namespace CatanService.Controllers
 
             game.TSAddLogRecord(new ResourceLog()
             {
+                LogType = LogType.Undo,
                 PlayerResources = resources,
-                Action = ServiceAction.ReturnResources,
+                Action = CatanAction.GrantResources,
                 PlayerName = playerName,
                 TradeResource = toAdd,
                 RequestUrl = this.Request.Path
@@ -226,7 +228,7 @@ namespace CatanService.Controllers
             // now lock it so that you change it in a thread safe way
             trade.GoldMine = -trade.GoldMine;
             resources.TSAdd(trade);
-            game.TSAddLogRecord(new ResourceLog() { PlayerResources = resources, Action = ServiceAction.TradeGold, PlayerName = playerName, TradeResource = trade, RequestUrl = this.Request.Path });
+            game.TSAddLogRecord(new ResourceLog() { PlayerResources = resources, Action = CatanAction.TradeGold, PlayerName = playerName, TradeResource = trade, RequestUrl = this.Request.Path });
             game.TSReleaseMonitors();
             return Ok(resources);
         }
@@ -419,7 +421,9 @@ namespace CatanService.Controllers
             finally
             {
                 // log it
-                game.TSAddLogRecord(new TakeLog() { PlayerName = fromName, FromName = fromName, ToName = toName, Taken = takenResource, FromResources = fromResources, ToResources = toResources, Action = ServiceAction.TakeCard, RequestUrl = this.Request.Path });
+                game.TSAddLogRecord(new TakeLog() { PlayerName = fromName, FromName = fromName, ToName = toName, Taken = takenResource, 
+                                    FromResources = fromResources, ToResources = toResources, Action = CatanAction.CardTaken, RequestUrl = this.Request.Path });
+
                 game.TSReleaseMonitors();
             }
 
@@ -452,7 +456,7 @@ namespace CatanService.Controllers
 
             playerResources.TSAddResource(resourceType, -cost);
             playerResources.TSAddResource(resourceType, 1);
-            game.TSAddLogRecord(new MeritimeTradeLog() { Cost = cost, PlayerName = playerName, Traded = resourceType, RequestUrl = this.Request.Path, Action = ServiceAction.MeritimeTrade });
+            game.TSAddLogRecord(new MeritimeTradeLog() { Cost = cost, PlayerName = playerName, Traded = resourceType, RequestUrl = this.Request.Path, Action = CatanAction.MeritimeTrade });
             game.TSReleaseMonitors();
             return Ok(playerResources);
         }

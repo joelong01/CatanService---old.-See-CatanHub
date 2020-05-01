@@ -1,5 +1,6 @@
 ﻿using Catan.Proxy;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
@@ -7,19 +8,29 @@ using System.Threading.Tasks;
 
 namespace CatanService.State
 {
-    public class PlayerState : PlayerResources
+    public class PlayerState : PlayerResources, IDisposable
     {
 
         //
         //  a lock to protect the resources
         private ReaderWriterLockSlim ResourceLock { get; } = new ReaderWriterLockSlim(); // protects access to this ResourceTracking
-        private List<object> _log = new List<object>(); // this one gets wiped every time TSWaitForLog returns
-        private List<object> _permLog = new List<object>(); // this one has *everything*
+        private readonly ConcurrentQueue<object> _queue = new ConcurrentQueue<object>(); // this one gets wiped every time TSWaitForLog returns
+        private readonly ConcurrentQueue<object> _permLog = new ConcurrentQueue<object>(); // this one has *everything*
         private TaskCompletionSource<object> _tcs = new TaskCompletionSource<object>();
         private ReaderWriterLockSlim TCSLock { get; } = new ReaderWriterLockSlim(); // protects access to this ResourceTracking
 
         public GameInfo ResourcesLeft { get; set; } // a game info where we will keep track of how many resources we can allocate
 
+        public void Dispose()
+        {
+            ResourceLock.Dispose();
+            if (_tcs != null)
+            {
+                _tcs.SetCanceled();
+                _tcs = null;
+            }
+            TCSLock.Dispose();
+        }
         public bool TSFreeEntitlement(Entitlement entitlement)
         {
             ResourceLock.EnterWriteLock();
@@ -94,32 +105,40 @@ namespace CatanService.State
         }
         public ServiceLogCollection GetLogCollection(int startAtSequenceNumber)
         {
-            ResourceLock.EnterReadLock();
-            try
+            //
+            //  we have nothing and asking for nothing - give nothing
+            //
+            if (startAtSequenceNumber == 0 && _permLog.Count == 0)
             {
-
-                var list = new List<object>();
-                for (int i = startAtSequenceNumber; i < _permLog.Count - 1; i++)
-                {
-                    list.Add(_permLog[i]);
-                }
-
                 return new ServiceLogCollection()
                 {
-                    LogRecords = new List<object>(_permLog),
+                    LogRecords = new List<object>(),
                     Count = _permLog.Count - startAtSequenceNumber,
                     CollectionId = Guid.NewGuid()
                 };
             }
-            finally
+            //
+            //  error condition
+            if (startAtSequenceNumber >= _permLog.Count) return null;
+
+            //
+            //  normal
+            var list = new List<object>(_permLog);          // queue implements IReadOnlyCollection<T>, so copy elements locall
+            list.RemoveRange(0, startAtSequenceNumber);     // get rid of the ones we don't ant
+
+
+            return new ServiceLogCollection()
             {
-                ResourceLock.ExitReadLock();
-            }
+                LogRecords = list,
+                Count = _permLog.Count - startAtSequenceNumber,
+                CollectionId = Guid.NewGuid()
+            };
+
         }
-         
+
         public async Task<ServiceLogCollection> TSWaitForLog()
         {
-         //   Console.WriteLine($"Waiting for log for {PlayerName}");
+            //   Console.WriteLine($"Waiting for log for {PlayerName}");
             ServiceLogCollection logCollection = null;
             try
             {
@@ -145,7 +164,7 @@ namespace CatanService.State
             }
             finally
             {
-               // Debug.WriteLine($"returning log for {PlayerName} returning {logCollection?.Count} records ");
+                // Debug.WriteLine($"returning log for {PlayerName} returning {logCollection?.Count} records ");
             }
 
         }
@@ -155,7 +174,27 @@ namespace CatanService.State
             ResourceLock.EnterWriteLock();
             try
             {
-                DevCards.Add(new DevelopmentCard() { DevCard = card, Played = false });
+                switch (card)
+                {
+                    case DevCardType.Knight:
+                        this.Knights++;
+                        break;
+                    case DevCardType.VictoryPoint:
+                        this.VictoryPoints++;
+                        break;
+                    case DevCardType.YearOfPlenty:
+                        this.YearOfPlenty++;
+                        break;
+                    case DevCardType.RoadBuilding:
+                        this.RoadBuilding++;
+                        break;
+                    case DevCardType.Monopoly:
+                        this.Monopoly++;
+                        break;
+                    case DevCardType.Unknown:
+                    default:
+                        throw new Exception($"Unexpected dev card type {card} - did you not update the proxy?");
+                }
             }
             finally
             {
@@ -310,15 +349,58 @@ namespace CatanService.State
             ResourceLock.EnterWriteLock();
             try
             {
-                foreach (var card in DevCards)
+                switch (devCardType)
                 {
-                    if (card.DevCard == devCardType && card.Played == false)
-                    {
-                        card.Played = true;
-                        return true;
-                    }
+                    case DevCardType.Knight:
+                        if (Knights > 0)
+                        {
+                            Knights--;
+                        }
+                        else
+                        {
+                            return false;
+                        }
+                        break;
+                    case DevCardType.VictoryPoint:
+                        return true; // what does it mean to play a VP?                        
+                    case DevCardType.YearOfPlenty:
+                        if (YearOfPlenty > 0)
+                        {
+                            YearOfPlenty--;
+                        }
+                        else
+                        {
+                            return false;
+                        }
+                        break;
+                    case DevCardType.RoadBuilding:
+                        if (RoadBuilding > 0)
+                        {
+                            RoadBuilding--;
+                        }
+                        else
+                        {
+                            return false;
+                        }
+                        break;
+                    case DevCardType.Monopoly:
+                        if (Monopoly > 0)
+                        {
+                            Monopoly--;
+                        }
+                        else
+                        {
+                            return false;
+                        }
+                        break;
+                    case DevCardType.Unknown:
+                    default:
+                        throw new Exception($"Unexpected resource type passed into ResourceCount {devCardType}");
+
                 }
-                return false;
+
+                PlayedDevCards.Add(devCardType);
+                return true;
             }
             finally
             {
@@ -342,9 +424,9 @@ namespace CatanService.State
             }
             try
             {
-                _log.Add(logEntry);
-                _permLog.Add(logEntry);
-               // Debug.WriteLine($"Added log for {PlayerName}. [LogId={((ServiceLogRecord)logEntry).LogId}] LogCount = {_log.Count}. LogType={((ServiceLogRecord)logEntry).LogType}");
+                _queue.Enqueue(logEntry);
+                _permLog.Enqueue(logEntry);
+                // Debug.WriteLine($"Added log for {PlayerName}. [LogId={((ServiceLogRecord)logEntry).LogId}] LogCount = {_log.Count}. LogType={((ServiceLogRecord)logEntry).LogType}");
             }
             finally
             {
@@ -362,17 +444,14 @@ namespace CatanService.State
         /// </summary>
         private List<object> TSGetLogEntries()
         {
-            ResourceLock.EnterWriteLock();
-            try
+            var ret = new List<object>();
+            while (_queue.TryDequeue(out object item))
             {
-                var ret = new List<object>(_log);
-                _log.Clear();
-                return ret;
+                ret.Add(item);
             }
-            finally
-            {
-                ResourceLock.ExitWriteLock();
-            }
+
+            return ret;
+
         }
         /// <summary>
         ///     A thread safe way to get a copy of the PlayerResources so that they can be held and serialized in a thread safe way
@@ -499,6 +578,7 @@ namespace CatanService.State
             }
         }
 
+        
     }
 
 }

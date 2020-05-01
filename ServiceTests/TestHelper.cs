@@ -19,7 +19,7 @@ namespace ServiceTests
         public string GameName { get; }
         public GameInfo GameInfo { get; set; } = new GameInfo();
         public List<string> Players { get; set; }
-        public List<List<ServiceLogRecord>> LogCollection { get; } = new List<List<ServiceLogRecord>>();
+        public List<List<LogHeader>> LogCollection { get; } = new List<List<LogHeader>>();
         ITestOutputHelper Output { get; set; }
         public TestHelper() : this(null, new GameInfo())
         {
@@ -127,7 +127,7 @@ namespace ServiceTests
         {
             // Debug.WriteLine($"Monitor_Callback started. iterating {_monitorIterations} thread id = {Thread.CurrentThread.ManagedThreadId} ");
 
-            List<ServiceLogRecord> logs;
+            List<LogHeader> logs;
             int count = 0;
             while (count < _monitorIterations)
             {
@@ -155,7 +155,7 @@ namespace ServiceTests
         }
         public async Task<T> GetLogRecordsFromEnd<T>(int offset = 1)
         {
-            List<ServiceLogRecord> logCollection = await Proxy.GetAllLogs(GameName, Players[0], offset);
+            List<LogHeader> logCollection = await Proxy.GetAllLogs(GameName, Players[0], offset);
             if (logCollection == null)
             {
                 // Debug.WriteLine($"LogCollection is null! {this.Proxy.LastError} {this.Proxy.LastErrorString}");
@@ -186,7 +186,7 @@ namespace ServiceTests
         /// <returns></returns>
         public async Task<T> MonitorGetLastRecord<T>(string player)
         {
-            List<ServiceLogRecord> logCollection = await Proxy.Monitor(GameName, player);
+            List<LogHeader> logCollection = await Proxy.Monitor(GameName, player);
             T ret = (T)(object)logCollection[^1];
             return ret;
         }
@@ -241,18 +241,38 @@ namespace ServiceTests
                 Brick = 0,
                 Wood = 0
             };
-            DevelopmentCard card = new DevelopmentCard()
-            {
-                Played = false,
-                DevCard = devCard,
-            };
             PlayerResources resources;
+            bool gotIt = false;
             do
             {
                 _ = await GrantResourcesAndAssertResult(player, tr);
                 resources = await Proxy.DevCardPurchase(GameName, player);
                 Assert.NotNull(resources);
-            } while (resources.DevCards.Contains(card) == false);
+                
+                switch (devCard)
+                {
+                    case DevCardType.Knight:
+                        if (resources.Knights > 0) gotIt = true;
+                        break;
+                    case DevCardType.VictoryPoint:
+                        if (resources.VictoryPoints > 0) gotIt = true;
+                        break;
+                    case DevCardType.YearOfPlenty:
+                        if (resources.YearOfPlenty > 0) gotIt = true;
+                        break;
+                    case DevCardType.RoadBuilding:
+                        if (resources.RoadBuilding > 0) gotIt = true;
+                        break;
+                    case DevCardType.Monopoly:
+                        if (resources.Monopoly > 0) gotIt = true;
+                        break;
+                    case DevCardType.Unknown:
+                        
+                    default:
+                        break;
+                }
+
+            } while ( gotIt == false);
             return resources;
 
         }

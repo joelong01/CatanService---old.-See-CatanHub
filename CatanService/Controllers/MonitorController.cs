@@ -31,7 +31,7 @@ namespace CatanService.Controllers
             //
             //  need this to get the TaskCompletionSource
             var clientState = game.GetPlayer(playerName);
-            
+
             if (clientState == null)
             {
 
@@ -43,6 +43,7 @@ namespace CatanService.Controllers
             {
                 return BadRequest(new CatanResult(CatanError.Unexpected) { Request = this.Request.Path, Description = $"Why did {playerName} release with no log entries?" });
             }
+           
             return Ok(logCollection);
 
         }
@@ -55,9 +56,9 @@ namespace CatanService.Controllers
             var game = TSGlobal.GetGame(gameName);
             if (game == null)
             {
-                 return NotFound(new CatanResult(CatanError.NoGameWithThatName) { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+                return NotFound(new CatanResult(CatanError.NoGameWithThatName) { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
             }
-            
+
             var clientState = game.GetPlayer(playerName);
 
             if (clientState == null)
@@ -71,10 +72,34 @@ namespace CatanService.Controllers
             return Ok(response);
 
         }
+        [HttpPost("postclientlog/{gameName}/{playerName}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public IActionResult PostClientLog([FromBody] object body, string gameName, string playerName)
+        {
+            var game = TSGlobal.GetGame(gameName);
+            if (game == null)
+            {
+                return NotFound(new CatanResult(CatanError.NoGameWithThatName) { Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+            }
 
+            var clientState = game.GetPlayer(playerName);
 
+            if (clientState == null)
+            {
 
+                return NotFound(new CatanResult(CatanError.NoPlayerWithThatName) { Request = this.Request.Path, Description = $"{playerName} in game '{gameName}' not found" });
 
+            }
+
+            LogHeader header = CatanProxy.DeserializeLogHeader(body.ToString());
+            game.TSAddLogRecord(header);
+            game.TSReleaseMonitors();
+          
+            return Ok(header as object);
+
+        }
 
     }
 }

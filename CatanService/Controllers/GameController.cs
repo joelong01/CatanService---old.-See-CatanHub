@@ -62,6 +62,77 @@ namespace CatanService.Controllers
 
         }
 
+        /// <summary>
+        ///     Create a new game by the player in the URL
+        /// </summary>
+        /// <param name="gameInfo"></param>
+        /// <param name="gameName"></param>
+        /// <param name="playerName"></param>
+        /// <returns></returns>
+        [HttpPost("state/{gameName}/{playerName}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public IActionResult SetState([FromBody] LogStateTranstion logStateTransition, string gameName, string playerName)
+        {
+            try
+            {
+                var game = TSGlobal.Games.TSGetGame(gameName);
+                if (game == null)
+                {
+                    var err = new CatanResult(CatanError.BadParameter)
+                    {
+                        CantanRequest = new CatanRequest() { Url = this.Request.Path },
+                        Description = $" Game '{gameName}' does not exist.  Create it first",
+                    };
+
+                    return BadRequest(err);
+
+                }
+
+                PlayerState clientState = game.GetPlayer(playerName);
+                if (clientState == null)
+                {
+                    var err = new CatanResult(CatanError.BadParameter)
+                    {
+                        CantanRequest = new CatanRequest() { Url = this.Request.Path },
+                        Description = $"{playerName} in Game '{gameName}' is not registered.",
+
+                    };
+                    err.ExtendedInformation.Add(new KeyValuePair<string, object>("ExistingGameInfo", clientState));
+                    return BadRequest(err);
+                }
+
+
+
+                //
+                //   add a log record so that all clients get players
+                var log = new StateChangeLog() { PlayerName = playerName, Action = CatanAction.ChangedState, RequestUrl = this.Request.Path, LogStateTranstion = logStateTransition };
+                game.TSAddLogRecord(log);
+
+                game.TSReleaseMonitors();
+                TSGlobal.DumpToConsole();
+                return Ok(log);
+            }
+            catch (Exception e)
+            {
+                var err = new CatanResult(CatanError.BadParameter)
+                {
+                    CantanRequest = new CatanRequest() { Url = this.Request.Path },
+                    Description = $"{this.Request.Path} threw an exception. {e}",
+                };
+
+                return BadRequest(err);
+            }
+
+        }
+
+        /// <summary>
+        ///     joing an existing game
+        ///     return the GameInfo
+        /// </summary>
+        /// <param name="gameName"></param>
+        /// <param name="playerName"></param>
+        /// <returns></returns>
         [HttpPost("joingame/{gameName}/{playerName}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -117,10 +188,13 @@ namespace CatanService.Controllers
                 game.TSSetPlayerResources(playerName, clientState);
 
                 //
-                // do not add a Log record -- the client gets the list of players when one of them calls Start
+                //   add a log record so that all clients get players
+                var gameLog = new GameLog() { Players = game.Players, PlayerName = playerName, Action = CatanAction.AddPlayer, RequestUrl = this.Request.Path, GameInfo=game.GameInfo };
+                game.TSAddLogRecord(gameLog);
 
+                game.TSReleaseMonitors();
                 TSGlobal.DumpToConsole();
-                return Ok(clientState);
+                return Ok(gameLog);
             }
             catch (Exception e)
             {
@@ -153,11 +227,12 @@ namespace CatanService.Controllers
                     return NotFound(err);
                 }
                 game.Started = true;
-                game.TSAddLogRecord(new GameLog() { Players = game.Players, PlayerName = "", Action = ServiceAction.GameStarted, RequestUrl = this.Request.Path });
+                var gameLog = new GameLog() { Players = game.Players, PlayerName = "", Action = CatanAction.Started, RequestUrl = this.Request.Path, GameInfo = game.GameInfo };
+                game.TSAddLogRecord(gameLog);
 
                 game.TSReleaseMonitors();
                 TSGlobal.DumpToConsole();
-                return Ok();
+                return Ok(gameLog);
             }
             catch (Exception e)
             {
@@ -255,7 +330,7 @@ namespace CatanService.Controllers
 
                 TSGlobal.Games.TSDeleteGame(gameName);
 
-                game.TSAddLogRecord(new GameLog() { Players = game.Players, Action = ServiceAction.GameDeleted, RequestUrl = this.Request.Path });
+                game.TSAddLogRecord(new GameLog() { Players = game.Players, Action = CatanAction.GameDeleted, RequestUrl = this.Request.Path, GameInfo = game.GameInfo });
                 game.TSReleaseMonitors();
                 //Console.WriteLine($"Deleted game {gameName}");
                 TSGlobal.DumpToConsole();
@@ -285,7 +360,8 @@ namespace CatanService.Controllers
         {
             try
             {
-                List<string> gamesToRemove = new List<string>();
+                // don't modify the collection in the loop over the collection...
+                List<string> gamesToRemove = new List<string>();                
                 foreach (var game in TSGlobal.Games.TSGetGames())
                 {
                     if (game.GameInfo.GameType == GameType.Test)
@@ -424,12 +500,49 @@ namespace CatanService.Controllers
             
 
         }
+        /// <summary>
+        ///     a client (playerName) wants to post new board (boardLog) for everybody in gameName to look at
+        /// </summary>
+        /// <param name="gameName"></param>
+        /// <param name="playerName"></param>
+        /// <returns></returns>
+        [HttpPost("board/{gameName}/{playerName}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult PostBoard([FromBody] RandomBoardLog logEntry, string gameName, string playerName)
+        {
+
+            var game = TSGlobal.GetGame(gameName);
+            if (game == null)
+            {
+                return NotFound(new CatanResult(CatanError.NoGameWithThatName) { CantanRequest = new CatanRequest() { Url = this.Request.Path, Body = null, BodyType = BodyType.None }, Description = $"Game '{gameName}' does not exist", Request = this.Request.Path });
+            }
+            var resources = game.GetPlayer(playerName);
+            if (resources == null)
+            {
+                return NotFound(new CatanResult(CatanError.NoPlayerWithThatName) { CantanRequest = new CatanRequest() { Url = this.Request.Path, Body = null, BodyType = BodyType.None }, Description = $"{playerName} in game '{gameName}' not found" });
+
+            }
+            if (logEntry == null)
+            {
+                return BadRequest(new CatanResult(CatanError.BadParameter) { CantanRequest = new CatanRequest() { Url = this.Request.Path, Body = null, BodyType = BodyType.None }, Description = $"RandomBoardSetting cannot be null" });
+            }
+
+            game.GameInfo.BoardSettings = CatanProxy.Deserialize<RandomBoardSettings>(logEntry.RandomBoardSettings.ToString());
+
+           
+            game.TSAddLogRecord(logEntry);
+            game.TSReleaseMonitors();
+            return Ok(logEntry);
+
+        }
 
         [HttpGet("help")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         public IActionResult GetHelp()
         {
-           return Ok(new CatanResult(CatanError.NoError) { Request = this.Request.Path, Description = $"You have landed on the Catan Service Help page!" });
+           return Ok(new CatanResult(CatanError.NoError) { Request = Request.Path, Description = $"You have landed on the Catan Service Help page!" });
         }
 
 

@@ -45,7 +45,7 @@ namespace CatanService.Controllers
 
             resources.TSAddDevCard(card);
             resources.TSAdd(cost.GetNegated());
-            game.TSAddLogRecord(new PurchaseLog() { Entitlement = Entitlement.DevCard, Action = ServiceAction.Purchased, PlayerResources = resources, PlayerName = playerName, RequestUrl = this.Request.Path });
+            game.TSAddLogRecord(new PurchaseLog() { Entitlement = Entitlement.DevCard, Action = CatanAction.Purchased, PlayerResources = resources, PlayerName = playerName, RequestUrl = this.Request.Path });
             game.TSReleaseMonitors();
             return Ok(resources);
         }
@@ -109,7 +109,7 @@ namespace CatanService.Controllers
             }
 
             resources.TSAdd(tr);
-            game.TSAddLogRecord(new ResourceLog() { PlayerResources = resources, Action = ServiceAction.PlayedYearOfPlenty, PlayerName = playerName, TradeResource = tr, RequestUrl = this.Request.Path });
+            game.TSAddLogRecord(new PlayedPlayedYearOfPlentyLog() { PlayerName = playerName, Acquired = tr, RequestUrl = this.Request.Path });
             return Ok(resources);
 
         }
@@ -136,10 +136,12 @@ namespace CatanService.Controllers
                 return NotFound(new CatanResult(CatanError.NoResource) { CantanRequest= new CatanRequest() { Url = this.Request.Path, Body = null, BodyType = BodyType.None }, Description = $"{playerName} in game {gameName} does not have a Monopoly to play." });
             }
 
-            int count = game.TSTakeAll(this.Request.Path, resourceType);
+            var ret = game.TSTakeAll(this.Request.Path, resourceType);
 
-            resources.TSAdd(count, resourceType);
-            game.TSAddLogRecord(new MonopolyLog() { PlayerResources = resources, Action = ServiceAction.PlayedMonopoly, PlayerName = playerName, ResourceType = resourceType, Count = count, RequestUrl = this.Request.Path }); //logs the gain of cards
+
+            resources.TSAdd(ret.total, resourceType);
+            ret.impactedPlayers[playerName] = ret.total;
+            game.TSAddLogRecord(new PlayedMonopoly() { PlayerName = playerName, ResourceType = resourceType,  RequestUrl = this.Request.Path }); 
             game.TSReleaseMonitors();
 
             return Ok(resources);
@@ -172,15 +174,25 @@ namespace CatanService.Controllers
             resources.TSAddEntitlement(Entitlement.Road);
 
 
-            game.TSAddLogRecord(new ServiceLogRecord() { Action = ServiceAction.PlayedRoadBuilding, PlayerName = playerName, RequestUrl = this.Request.Path });
+            game.TSAddLogRecord(new PlayedDevCardModel() { Action = CatanAction.PlayedDevCard, DevCard = DevCardType.RoadBuilding, PlayerName = playerName, RequestUrl = this.Request.Path });
             game.TSReleaseMonitors();
 
             return Ok(resources);
         }
+        
+        /// <summary>
+        ///     The originator (playerName) has already done this action in their game by the time this is called.
+        ///     all we do is put the log in the queue to be notified back to the rest of the clients.
+        /// </summary>
+        /// <param name="knightLog"></param>
+        /// <param name="gameName"></param>
+        /// <param name="playerName"></param>
+        /// <returns></returns>
+        
         [HttpPost("play/knight/{gameName}/{playerName}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public IActionResult PlayKnight(string gameName, string playerName)
+        public IActionResult PlayKnight([FromBody] KnightPlayedLog knightLog, string gameName, string playerName)
         {
             var game = TSGlobal.GetGame(gameName);
             if (game == null)
@@ -198,9 +210,8 @@ namespace CatanService.Controllers
             {
                 return NotFound(new CatanResult(CatanError.InsufficientResource) { Request = this.Request.Path, Description = $"{playerName} in game {gameName} does not have a Knight card to play." });
             }
-
-
-            game.TSAddLogRecord(new ServiceLogRecord() { Action = ServiceAction.PlayedKnight, PlayerName = playerName, RequestUrl = this.Request.Path });
+            
+            game.TSAddLogRecord(knightLog); 
             game.TSReleaseMonitors();
 
             return Ok(resources);

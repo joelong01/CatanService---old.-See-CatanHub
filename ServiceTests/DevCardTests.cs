@@ -48,20 +48,20 @@ namespace ServiceTests
 
                 var resources = await helper.GrantResourcesAndAssertResult(player, tr);
 
-                Assert.Empty(resources.DevCards);
-
+                Assert.Empty(resources.PlayedDevCards);
+                //
+                //   buy dev cards
                 for (int i = 0; i < maxCards * 5; i++)
                 {
                     resources = await helper.Proxy.DevCardPurchase(helper.GameName, player);
                     Assert.Equal(maxCards * 5 - i - 1, resources.Ore);
                     Assert.Equal(maxCards * 5 - i - 1, resources.Wheat);
                     Assert.Equal(maxCards * 5 - i - 1, resources.Sheep);
-                    Assert.Equal(i, resources.DevCards.Count - 1);
-                    Assert.False(resources.DevCards[i].Played);
+                    Assert.Equal(i+1, resources.UnplayedDevCards);                    
                     Assert.Null(helper.Proxy.LastError);
                     Assert.Empty(helper.Proxy.LastErrorString);
                     PurchaseLog purchaseLog  = await helper.MonitorGetLastRecord<PurchaseLog>(player);
-                    Assert.Equal(ServiceAction.Purchased, purchaseLog.Action);
+                    Assert.Equal(CatanAction.Purchased, purchaseLog.Action);
                     Assert.Equal(player, purchaseLog.PlayerName);
                     Assert.Equal(Entitlement.DevCard, purchaseLog.Entitlement);
                     Assert.Null(purchaseLog.UndoRequest);
@@ -76,44 +76,14 @@ namespace ServiceTests
                 Assert.Equal(0, resources.GoldMine);
 
 
-                int vp = 0;
-                int yop = 0;
-                int knight = 0;
-                int mono = 0;
-                int rb = 0;
-
-                foreach (var dc in resources.DevCards)
-                {
-                    switch (dc.DevCard)
-                    {
-                        case DevCardType.Knight:
-                            knight++;
-                            break;
-                        case DevCardType.VictoryPoint:
-                            vp++;
-                            break;
-                        case DevCardType.YearOfPlenty:
-                            yop++;
-                            break;
-                        case DevCardType.RoadBuilding:
-                            rb++;
-                            break;
-                        case DevCardType.Monopoly:
-                            mono++;
-                            break;
-                        case DevCardType.Unknown:
-                        default:
-                            Assert.True(false);
-                            break;
-                    }
-                }
+              
                 //
                 //  these are for the "normal" game
-                Assert.Equal(gameInfo.Knight, knight);
-                Assert.Equal(gameInfo.VictoryPoint, vp);
-                Assert.Equal(gameInfo.YearOfPlenty, yop);
-                Assert.Equal(gameInfo.Monopoly, mono);
-                Assert.Equal(gameInfo.RoadBuilding, rb);
+                Assert.Equal(gameInfo.Knight, resources.Knights);
+                Assert.Equal(gameInfo.VictoryPoint, resources.VictoryPoints);
+                Assert.Equal(gameInfo.YearOfPlenty, resources.YearOfPlenty);
+                Assert.Equal(gameInfo.Monopoly, resources.Monopoly);
+                Assert.Equal(gameInfo.RoadBuilding, resources.RoadBuilding);
 
                 //
                 //  try to buy a card w/ no resources
@@ -152,7 +122,7 @@ namespace ServiceTests
                 };
 
                 tr.Brick = 1;
-                for (int i = 0; i < yop; i++)
+                for (int i = 0; i < resources.YearOfPlenty; i++)
                 {
                     resources = await helper.Proxy.PlayYearOfPlenty(helper.GameName, player, tr);
                     Assert.NotNull(resources);
@@ -206,17 +176,12 @@ namespace ServiceTests
                     _ = await helper.GrantResourcesAndAssertResult(p, tr);
 
                 }
-                DevelopmentCard monopoly = new DevelopmentCard()
-                {
-                    Played = false,
-                    DevCard = DevCardType.Monopoly,
-                };
-
+               
                 // buy a dev card - gameInfo says there is only 1 of them and it is Monopoly
 
                 var resources = await helper.Proxy.DevCardPurchase(helper.GameName, players[0]);
                 Assert.NotNull(resources);
-                Assert.Contains(monopoly, resources.DevCards);
+                Assert.True(resources.Monopoly > 0);
                 resources = await helper.Proxy.PlayMonopoly(helper.GameName, players[0], ResourceType.Wood);
                 Assert.Equal(4, resources.Wood);
                 Assert.Equal(0, resources.Ore);
@@ -275,14 +240,10 @@ namespace ServiceTests
                 {
                     _ = await helper.GrantResourcesAndAssertResult(p, tr);
                 }
-                DevelopmentCard YoP = new DevelopmentCard()
-                {
-                    Played = false,
-                    DevCard = DevCardType.YearOfPlenty,
-                };
+               
                 PlayerResources resources = await helper.BuyDevCard(players[0], DevCardType.YearOfPlenty);
                 Assert.NotNull(resources);
-                Assert.Contains(YoP, resources.DevCards);
+                Assert.True(resources.YearOfPlenty > 0);
 
                 resources = await helper.Proxy.PlayYearOfPlenty(helper.GameName, players[0], tr);
                 Assert.Null(resources);
@@ -349,9 +310,9 @@ namespace ServiceTests
                 PlayerResources resources = await helper.BuyDevCard(players[0], DevCardType.RoadBuilding);
                 Assert.Equal(0, resources.Roads);
                 Assert.NotNull(resources);
-                Assert.NotEmpty(resources.DevCards);
-                var roadBuilding = new DevelopmentCard() { DevCard = DevCardType.RoadBuilding, Played = false };
-                Assert.Contains(roadBuilding, resources.DevCards);
+                
+                
+                Assert.True(resources.RoadBuilding > 0);
                 resources = await helper.Proxy.PlayRoadBuilding(helper.GameName, players[0]);
                 Assert.NotNull(resources);
                 Assert.Equal(2, resources.Roads);
@@ -385,13 +346,13 @@ namespace ServiceTests
                 PlayerResources resources = await helper.BuyDevCard(players[0], DevCardType.Knight);
                 Assert.Equal(0, resources.Roads);
                 Assert.NotNull(resources);
-                Assert.NotEmpty(resources.DevCards);
-                var roadBuilding = new DevelopmentCard() { DevCard = DevCardType.Knight, Played = false };
-                Assert.Contains(roadBuilding, resources.DevCards);
-                Assert.False(resources.DevCards[0].Played);
-                resources = await helper.Proxy.PlayKnight(helper.GameName, players[0]);
+                Assert.True(resources.Knights > 0);
+                
+                
+                
+                resources = await helper.Proxy.KnightPlayed(helper.GameName, players[0], null);
                 Assert.NotNull(resources);
-                Assert.True(resources.DevCards[0].Played);
+                Assert.Contains(DevCardType.Knight, resources.PlayedDevCards);
 
             }
         }

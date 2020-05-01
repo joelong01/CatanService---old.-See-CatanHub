@@ -81,7 +81,7 @@ namespace ServiceTests
 
                     //
                     //  get the log record - it should have resources we just granted
-                    List<ServiceLogRecord> logCollection = await helper.Proxy.Monitor(helper.GameName, players[0]);
+                    List<LogHeader> logCollection = await helper.Proxy.Monitor(helper.GameName, players[0]);
                     var resourceLog = logCollection[^1] as ResourceLog;
                     Assert.True(resourceLog.PlayerResources.Equivalent(resourcesAfterGrant));
                     Assert.True(resourceLog.TradeResource.Equivalent(loopTempResourceAsk));
@@ -101,7 +101,8 @@ namespace ServiceTests
                     //  get the log for the Undo Action
                     logCollection = await helper.Proxy.Monitor(helper.GameName, players[0]);
                     ResourceLog undoLog = logCollection[^1] as ResourceLog;
-                    Assert.Equal(ServiceAction.ReturnResources, undoLog.Action);
+                    Assert.Equal(CatanAction.Purchased, undoLog.Action);
+                    Assert.Equal(LogType.Undo, undoLog.LogType);
                     Assert.True(undoLog.PlayerResources.Equivalent(resourcesAfterUndo));
                     Assert.True(undoLog.PlayerResources.Equivalent(startingResource));
                     Assert.Equal(players[0], undoLog.PlayerName);

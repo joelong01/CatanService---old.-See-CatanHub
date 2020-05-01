@@ -39,10 +39,9 @@ namespace ServiceTests
 
                 //
                 //  get the game log and verify that we have all the same players
-                List<ServiceLogRecord> logCollection = await helper.Proxy.Monitor(helper.GameName, helper.Players[0]);
+                List<LogHeader> logCollection = await helper.Proxy.Monitor(helper.GameName, helper.Players[0]);
                 GameLog gameLog = logCollection[^1] as GameLog;
-                Assert.Equal(ServiceAction.GameStarted, gameLog.Action);
-                Assert.Equal(ServiceLogType.Game, gameLog.LogType);
+                Assert.Equal(CatanAction.Started, gameLog.Action);
                 Assert.NotEmpty(gameLog.Players);
                 List<string> allPlayers = new List<string>(helper.Players);
                 foreach (var player in gameLog.Players)
@@ -68,16 +67,14 @@ namespace ServiceTests
                 var gameInfo = new GameInfo();
                 var resources = await helper.Proxy.JoinGame(helper.GameName, "Miller");
                 if (resources is null ) helper.TraceMessage($"{helper.Proxy.LastError.Description}");
-                Assert.Equal("Miller", resources.PlayerName);
-                Assert.Equal(helper.GameName, resources.GameName);
-
+                
 
                 //   await helper.StartMonitoring(1);
 
                 await helper.Proxy.StartGame(helper.GameName);
-                List<ServiceLogRecord> logCollection = await helper.Proxy.Monitor(helper.GameName, players[0]);
+                List<LogHeader> logCollection = await helper.Proxy.Monitor(helper.GameName, players[0]);
                 GameLog gameLog = logCollection[^1] as GameLog;
-                Assert.Equal(ServiceAction.GameStarted, gameLog.Action);
+                Assert.Equal(CatanAction.Started, gameLog.Action);
                 Assert.Equal(5, gameLog.Players.Count);
 
 
