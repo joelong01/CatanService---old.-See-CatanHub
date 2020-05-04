@@ -4,6 +4,7 @@ using Catan.Proxy;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
+using System.Text.Json;
 
 namespace CatanService.Controllers
 {
@@ -76,7 +77,7 @@ namespace CatanService.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public IActionResult PostClientLog([FromBody] object body, string gameName, string playerName)
+        public IActionResult PostClientLog([FromBody] JsonElement body, string gameName, string playerName)
         {
             var game = TSGlobal.GetGame(gameName);
             if (game == null)
