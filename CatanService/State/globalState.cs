@@ -232,7 +232,7 @@ namespace CatanService.State
                     string json = Encoding.UTF8.GetString(buffer, 0, result.Count);
                     WsMessage message = CatanProxy.Deserialize<WsMessage>(json); // need the CatanProxies JsonOptions
                     if (message == null) break;
-                    if (message.MessageType != WebSocketMessage.Ack) break;
+                    if (message.MessageType != CatanWsMessageType.Ack) break;
                     if (result.CloseStatus != null && result.CloseStatus.HasValue == false) break;
                 }
                 catch(TimeoutException)
@@ -287,7 +287,7 @@ namespace CatanService.State
                 }
                 HistoricalMessages = queu;
 
-                var message = new WsMessage() { Data = new WsGameMessage() { GameInfo = game.GameInfo }, DataType = typeof(WsGameMessage).FullName, MessageType = WebSocketMessage.GameDeleted };
+                var message = new WsMessage() { Data = new WsGameMessage() { GameInfo = game.GameInfo }, DataType = typeof(WsGameMessage).FullName, MessageType = CatanWsMessageType.GameDeleted };
                 PostToAllClients(gameId, message);
                 
             }
@@ -310,7 +310,7 @@ namespace CatanService.State
 
             GameDictionary.TryAdd(gameName, game);
             
-            PostToAllClients(game.GameInfo.Id, new WsMessage() { Data = new WsGameMessage() { GameInfo = game.GameInfo }, DataType = typeof(WsGameMessage).FullName, MessageType = WebSocketMessage.GameAdded });
+            PostToAllClients(game.GameInfo.Id, new WsMessage() { Data = new WsGameMessage() { GameInfo = game.GameInfo }, DataType = typeof(WsGameMessage).FullName, MessageType = CatanWsMessageType.GameAdded });
             return true;
         }
 

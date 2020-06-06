@@ -112,9 +112,9 @@ namespace CatanService
             {
                 string json = Encoding.UTF8.GetString(buffer, 0, result.Count);
                 WsMessage message = CatanProxy.Deserialize<WsMessage>(json);
-                if (message.MessageType != WebSocketMessage.RegisterForGameNotifications)
+                if (message.MessageType != CatanWsMessageType.RegisterForGameNotifications)
                 {
-                    throw new Exception($"Invalid Message sent: {message} - TypeName=WebSocketMessage");
+                    throw new Exception($"Invalid Message sent: {message} - DataTypeName=CatanWsMessageType");
                 }
 
                 await GameController.Games.RegisterWebSocket(context, webSocket); // runs until the end
