@@ -52,7 +52,7 @@ namespace CatanService
 
             });
 
-
+            services.AddSignalR().AddAzureSignalR();
 
         }
 
@@ -64,6 +64,10 @@ namespace CatanService
             {
                 app.UseDeveloperExceptionPage();
             }
+
+            app.UseHttpsRedirection();
+            app.UseFileServer();
+
             var webSocketOptions = new WebSocketOptions()
             {
                 KeepAliveInterval = TimeSpan.FromSeconds(120),
@@ -97,6 +101,7 @@ namespace CatanService
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapControllers();
+                endpoints.MapHub<CatanHub>("/catan");
             });
 
 
