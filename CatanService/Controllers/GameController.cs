@@ -168,7 +168,12 @@ namespace CatanService.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public IActionResult GetHelp()
         {
-            return Ok("hello!");
+            var res = new CatanResult(CatanError.BadParameter)
+            {
+                CantanRequest = new CatanRequest() { Url = this.Request.Path },
+                Description = $"Version=1.10",
+            };
+            return Ok(res);
         }
 
         [HttpGet("players/{gameId}")]
