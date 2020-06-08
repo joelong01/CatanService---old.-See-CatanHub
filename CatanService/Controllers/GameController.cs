@@ -171,7 +171,7 @@ namespace CatanService.Controllers
             var res = new CatanResult(CatanError.BadParameter)
             {
                 CantanRequest = new CatanRequest() { Url = this.Request.Path },
-                Description = $"Version=1.10",
+                Description = $"Version=2.1",
             };
             return Ok(res);
         }
