@@ -5,7 +5,18 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.SignalR;
 
 namespace CatanService
+
 {
+
+    public interface ICatanClient
+    {
+        Task BroadcastMessage(string playerName, string message);
+        Task DeleteGame(string gameName);
+        Task CreateGame(string gameName, string playerName, string gameInfo);
+        Task JoinGame(string gameName, string playerName);
+        Task SendPrivateMessage(string message);
+    }
+
     public static class SignalRConnectionToGroupsMap
     {
         #region Properties + Fields 
@@ -64,31 +75,33 @@ namespace CatanService
       
     }
 
-    public class CatanHub : Hub
+    public class CatanHub : Hub<ICatanClient>
     {
        
         #region Methods
 
         public Task BroadcastMessage(string gameName, string playerName, string message)
         {
-            return Clients.Group(gameName).SendAsync("BroadcastMessage", playerName, message);
+            return Clients.Group(gameName).BroadcastMessage(playerName, message);
         }
 
-        public async Task CreateGame(string gameName, string playerName)
+        public async Task CreateGame(string gameName, string playerName, string jsonGameInfo)
         {
             if (SignalRConnectionToGroupsMap.TryAddGroup(Context.ConnectionId, gameName))
             {
                 await Groups.AddToGroupAsync(Context.ConnectionId, gameName);
-                await Clients.Group(gameName).SendAsync("CreateGame", playerName);
+                await Clients.Group(gameName).CreateGame(gameName, playerName, jsonGameInfo);
             }
         }
-
+       
         public async Task DeleteGame(string gameName)
         {
-            await Clients.Group(gameName).SendAsync("DeletingGame", gameName);
+            
             foreach (var id in SignalRConnectionToGroupsMap.Connections(gameName))
             {
+                await Clients.Group(gameName).DeleteGame(gameName);
                 await Groups.RemoveFromGroupAsync(id, gameName);
+
             }
         }
 
@@ -97,7 +110,7 @@ namespace CatanService
             if (SignalRConnectionToGroupsMap.TryAddGroup(Context.ConnectionId, gameName))
             {
                 await Groups.AddToGroupAsync(Context.ConnectionId, gameName);
-                await Clients.Group(gameName).SendAsync("JoinedGame", gameName, playerName);
+                await Clients.Group(gameName).JoinGame(gameName, playerName);
             }
 
             
@@ -105,8 +118,10 @@ namespace CatanService
 
         public Task SendPrivateMessage(string playerName, string message)
         {
-            return Clients.User(playerName).SendAsync("PrivateMessage", message);
+            return Clients.User(playerName).SendPrivateMessage(message);
         }
+
+       
 
         #endregion Methods
 

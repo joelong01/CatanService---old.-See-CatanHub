@@ -77,7 +77,7 @@ namespace CatanService
             app.UseWebSockets(webSocketOptions);
             app.Use(async (context, next) =>
             {
-                if (context.Request.Path == "/catan/game/monitor/ws")
+                if (context.Request.Path == "/ws")
                 {
                     if (context.WebSockets.IsWebSocketRequest)
                     {

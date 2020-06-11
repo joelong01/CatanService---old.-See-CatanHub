@@ -17,23 +17,29 @@ namespace CatanService
             CreateHostBuilder(args).Build().Run();
         }
 
-        //public static IHostBuilder CreateHostBuilder(string[] args) =>
-        //    Host.CreateDefaultBuilder(args)
-        //        .ConfigureWebHostDefaults(webBuilder =>
-        //        {
-        //            webBuilder.ConfigureKestrel(serverOptions =>
-        //            {
-        //                serverOptions.Listen(IPAddress.Parse("192.168.1.128"), 5000);
-
-        //            }).UseStartup<Startup>();
-        //        });
-
         public static IHostBuilder CreateHostBuilder(string[] args) =>
-           Host.CreateDefaultBuilder(args)
-               .ConfigureWebHostDefaults(webBuilder =>
-               {
-                   webBuilder.UseStartup<Startup>();
-               });
+            Host.CreateDefaultBuilder(args)
+                .ConfigureWebHostDefaults(webBuilder =>
+                {
+                    webBuilder.ConfigureKestrel(serverOptions =>
+                    {
+                    
+                        string addr = Dns.GetHostName();
+                        IPHostEntry he = Dns.GetHostEntry(addr);
+                        foreach (var address in he.AddressList)
+                        {                         
+                            serverOptions.Listen(address, 5000);
+                        }
+
+                    }).UseStartup<Startup>();
+                });
+
+        //public static IHostBuilder CreateHostBuilder(string[] args) =>
+        //   Host.CreateDefaultBuilder(args)
+        //       .ConfigureWebHostDefaults(webBuilder =>
+        //       {
+        //           webBuilder.UseStartup<Startup>();
+        //       });
     }
 }
 

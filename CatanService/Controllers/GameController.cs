@@ -10,6 +10,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using System.Threading;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using System.Diagnostics.Contracts;
+using Microsoft.Azure.SignalR.Protocol;
 
 namespace CatanService.Controllers
 {
@@ -91,25 +92,37 @@ namespace CatanService.Controllers
             }
         }
 
-        [HttpDelete("{gameId}")]
+        [HttpDelete("{id}/{by}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult DeleteGame(string gameId)
+        public IActionResult DeleteGame(Guid id, string by)
         {
             try
             {
-                bool success = Games.DeleteGame(gameId, out Game game);
+                bool success = Games.DeleteGame(id, out Game game);
                 if (!success)
                 {
                     var err = new CatanResult(CatanError.BadParameter)
                     {
                         CantanRequest = new CatanRequest() { Url = this.Request.Path },
-                        Description = $" Game '{gameId}' does not exist",
+                        Description = $" Game '{id}' does not exist",
                     };
 
-                    CatanMessage message = new CatanMessage() { Data = err, Sequence = 0, DataTypeName = typeof(CatanResult).FullName };
-                    return NotFound(message);
+                    return NotFound(err);
                 }
+                CatanServiceMessage msg = new CatanServiceMessage() { GameInfo = game.GameInfo, PlayerName = by };
+
+                CatanMessage message = new CatanMessage()
+                {
+                    ActionType = ActionType.Normal,
+                    Data = (object)msg,
+                    DataTypeName = typeof(GameInfo).FullName,
+                    From = by,
+                    Sequence = game.GetNextSequenceNumber(),
+                    MessageType = MessageType.DeleteGame
+                };
+                game.PostLog(message);
+                game.ReleaseLogs();
 
                 return GetGames();
             }
@@ -126,17 +139,18 @@ namespace CatanService.Controllers
             }
         }
 
-        [HttpGet("{gameId}/{playerName}")]
+        [HttpGet("{id}/{playerName}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public IActionResult GetGameLogRecords(string gameId, string playerName)
+        public IActionResult GetGameLogRecords(Guid id, string playerName)
         {
-            Game game = Games.GetGame(gameId);
+
+            Game game = Games.GetGame(id);
 
             if (game == default)
             {
-                var err = new CatanResult(CatanError.NoGameWithThatName) { Description = $"Game '{gameId}' does not exist", Request = this.Request.Path };
+                var err = new CatanResult(CatanError.NoGameWithThatName) { Description = $"Game '{id}' does not exist", Request = this.Request.Path };
                 CatanMessage errMessage = new CatanMessage() { Data = err, Sequence = 0, DataTypeName = typeof(CatanResult).FullName };
                 return NotFound(errMessage);
             }
@@ -146,8 +160,9 @@ namespace CatanService.Controllers
                 var err = new CatanResult(CatanError.BadParameter)
                 {
                     CantanRequest = new CatanRequest() { Url = this.Request.Path },
-                    Description = $"Player '{playerName}' is not a member of Game '{gameId}'.",
+                    Description = $"Player '{playerName}' is not a member of Game with id = '{id}'.",
                 };
+
                 CatanMessage errMessage = new CatanMessage() { Data = err, Sequence = 0, DataTypeName = typeof(CatanResult).FullName };
                 return NotFound(errMessage);
             }
@@ -179,8 +194,9 @@ namespace CatanService.Controllers
         [HttpGet("players/{gameId}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult GetPlayersInGame(string gameId)
+        public IActionResult GetPlayersInGame(Guid gameId)
         {
+
             Game game = Games.GetGame(gameId);
             if (game == default)
             {
@@ -196,22 +212,23 @@ namespace CatanService.Controllers
             return Ok(game.NameToPlayerDictionary.Keys);
         }
 
-        [HttpPost("join/{gameId}/{playerName}")]
+        [HttpPost("join/{playerName}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public IActionResult JoinGame(string gameId, string playerName)
+        public IActionResult JoinGame([FromBody] GameInfo gameInfo, string playerName)
         {
             try
             {
-                Game game = Games.GetGame(gameId);
 
-                if (game == default)
+                Game game = Games.GetGame(gameInfo.Id);
+
+                if (game == null)
 
                 {
                     var err = new CatanResult(CatanError.BadParameter)
                     {
                         CantanRequest = new CatanRequest() { Url = this.Request.Path },
-                        Description = $" Game '{gameId}' already exists.  You can join it or delete it",
+                        Description = $" Game '{gameInfo.Name}' with id={gameInfo.Id} does not exist.  Call Monitor() before calling Join()",
                     };
 
                     CatanMessage message = new CatanMessage() { Data = err, Sequence = 0, DataTypeName = typeof(CatanResult).FullName };
@@ -219,15 +236,16 @@ namespace CatanService.Controllers
                 }
 
                 //
-                // try to add a player, passing in the game log
-                //
-                bool success = game.NameToPlayerDictionary.TryAdd(playerName, new Player(game.GameLog));
+                //  should already be in here since you shoudl have called Monitor()
+                bool success = game.NameToPlayerDictionary.TryGetValue(playerName, out Player player);
+
+
                 if (!success)
                 {
                     var err = new CatanResult(CatanError.BadParameter)
                     {
                         CantanRequest = new CatanRequest() { Url = this.Request.Path },
-                        Description = $"Player '{playerName}' is already a member of Game '{gameId}'.",
+                        Description = $"Player '{playerName}' not found for game  '{gameInfo.Name}'. Did you call Monitor() before Join()?",
                     };
 
                     CatanMessage message = new CatanMessage() { Data = err, Sequence = 0, DataTypeName = typeof(CatanResult).FullName };
@@ -249,33 +267,107 @@ namespace CatanService.Controllers
             }
         }
 
-        [HttpGet("monitor/{gameId}/{playerName}")]
+
+
+        [HttpGet("monitor/{id}/{gameName}/{playerName}/{requestAutoJoin}/{delete}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> Monitor(string gameId, string playerName)
+        public async Task<IActionResult> Monitor(Guid id, string gameName, string playerName, bool requestAutoJoin, bool delete)
         {
-            Game game = Games.GetGame(gameId);
-
-            if (game == default)
+            Game game = null;
+            bool success;
+            List<CatanMessage> messages = new List<CatanMessage>();
+            if (game != null && game.GameInfo.Creator == playerName && delete)
             {
-                var err = new CatanResult(CatanError.NoGameWithThatName) { Description = $"Game '{gameId}' does not exist", Request = this.Request.Path };
-                CatanMessage errMessage = new CatanMessage() { Data = err, Sequence = 0, DataTypeName = typeof(CatanResult).FullName };
-                return NotFound(errMessage);
+                success = Games.DeleteGame(id, out game);
+                if (success)
+                {
+                    CatanServiceMessage msg = new CatanServiceMessage() { GameInfo = game.GameInfo, PlayerName = playerName };
+
+                    CatanMessage message = new CatanMessage()
+                    {
+                        ActionType = ActionType.Normal,
+                        Data = (object)msg,
+                        DataTypeName = typeof(GameInfo).FullName,
+                        From = playerName,
+                        Sequence = game.GetNextSequenceNumber(),
+                        MessageType = MessageType.DeleteGame
+                    };
+
+                    messages.Add(message);
+                }
             }
-            bool success = game.NameToPlayerDictionary.TryGetValue(playerName, out Player player);
+            else
+            {
+                game = Games.GetGame(id);
+            }
+            
+            if (game == null)
+            {
+                GameInfo gameInfo = new GameInfo()
+                {
+                    Id = id,
+                    Name = gameName,
+                    Creator = playerName,
+                    RequestAutoJoin = requestAutoJoin,
+                    Started = false
+                };
+
+
+                game = new Game() { GameInfo = gameInfo };
+
+                Games.AddGame(gameInfo.Id, game);
+
+                CatanServiceMessage msg = new CatanServiceMessage() { GameInfo = gameInfo, PlayerName = playerName };
+
+                CatanMessage message = new CatanMessage()
+                {
+                    ActionType = ActionType.Normal,
+                    Data = (object)msg,
+                    DataTypeName = typeof(GameInfo).FullName,
+                    From = playerName,
+                    Sequence = game.GetNextSequenceNumber(),
+                    MessageType = MessageType.CreateGame
+                };
+
+                messages.Add(message);
+
+            }
+
+            success = game.NameToPlayerDictionary.TryGetValue(playerName, out Player player);
             if (!success)
             {
-                var err = new CatanResult(CatanError.BadParameter)
+                // add the player
+
+                game.NameToPlayerDictionary.TryAdd(playerName, new Player(game.GameLog));
+                //
+                //  return the player Joined message
+                CatanServiceMessage msg = new CatanServiceMessage() { GameInfo = game.GameInfo, PlayerName = playerName };
+
+                CatanMessage message = new CatanMessage()
                 {
-                    CantanRequest = new CatanRequest() { Url = this.Request.Path },
-                    Description = $"Player '{playerName}' is already a member of Game '{gameId}'.",
+                    ActionType = ActionType.Normal,
+                    Data = (object)msg,
+                    DataTypeName = typeof(GameInfo).FullName,
+                    From = playerName,
+                    Sequence = game.GetNextSequenceNumber(),
+                    MessageType = MessageType.JoinGame
                 };
-                CatanMessage errMessage = new CatanMessage() { Data = err, Sequence = 0, DataTypeName = typeof(CatanResult).FullName };
-                return NotFound(errMessage);
+
+                messages.Add(message);
+            }
+            //
+            //  this will contain the boot strap messages the first time we are called
+            if (messages.Count > 0)
+            {
+                return Ok(messages);
             }
 
-            var messages = await player.WaitForLogEntries();
+            //
+            //  if you got here the game has been created and the game has been joined
+
+            messages = await player.WaitForLogEntries();
 
             if (messages == null || messages.Count == 0)
             {
@@ -290,13 +382,52 @@ namespace CatanService.Controllers
         [HttpPost("message/{gameId}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult PostMessage([FromBody] CatanMessage message, string gameId)
+        public IActionResult BroadcastMessage([FromBody] CatanMessage message, Guid gameId)
         {
             try
             {
+
                 Game game = Games.GetGame(gameId);
 
-                if (game == default)
+                if (game == null)
+                {
+                    var err = new CatanResult(CatanError.BadParameter)
+                    {
+                        CantanRequest = new CatanRequest() { Url = this.Request.Path },
+                        Description = $"Game '{gameId}' does not exists",
+                    };
+
+                    CatanMessage errMessage = new CatanMessage() { Data = err, Sequence = 0, DataTypeName = typeof(CatanResult).FullName };
+                    return NotFound(errMessage);
+                }
+                message.MessageType = MessageType.BroadcastMessage;
+                game.PostLog(message);
+                game.ReleaseLogs();
+                return Ok(message);
+            }
+            catch (Exception e)
+            {
+                var err = new CatanResult(CatanError.BadParameter)
+                {
+                    CantanRequest = new CatanRequest() { Url = this.Request.Path },
+                    Description = $"{this.Request.Path} threw an exception. {e}",
+                };
+                CatanMessage errMessage = new CatanMessage() { Data = err, Sequence = 0, DataTypeName = typeof(CatanResult).FullName };
+                return BadRequest(errMessage);
+            }
+        }
+
+        [HttpPost("privatemessage/{gameId}/{to}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public IActionResult SendPrivateMessage([FromBody] CatanMessage message, Guid gameId, string to)
+        {
+            try
+            {
+
+                Game game = Games.GetGame(gameId);
+
+                if (game == null)
                 {
                     var err = new CatanResult(CatanError.BadParameter)
                     {
@@ -308,8 +439,25 @@ namespace CatanService.Controllers
                     return NotFound(errMessage);
                 }
 
-                game.PostLog(message);
-                game.ReleaseLogs();
+
+                //
+                //  should already be in here since you shoudl have called Monitor()
+                bool success = game.NameToPlayerDictionary.TryGetValue(to, out Player player);
+
+
+                if (!success)
+                {
+                    var err = new CatanResult(CatanError.BadParameter)
+                    {
+                        CantanRequest = new CatanRequest() { Url = this.Request.Path },
+                        Description = $"Player '{to}' not found for game  '{gameId}'. Did you call Monitor() before Join()?",
+                    };
+
+                    return BadRequest(err);
+                }
+                message.MessageType = MessageType.PrivateMessage;
+                player.PlayerLog.Enqueue(message);
+                player.ReleaseLog();
                 return Ok(message);
             }
             catch (Exception e)

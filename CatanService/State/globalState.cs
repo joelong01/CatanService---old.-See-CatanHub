@@ -124,6 +124,8 @@ namespace CatanService.State
 
 
         }
+
+        
     }
 
 
@@ -131,7 +133,7 @@ namespace CatanService.State
     {
 
         private int GlobalSequnceNumber = 0;
-
+     
         /// <summary>
         ///     All the logs for the entire game
         /// </summary>
@@ -144,6 +146,13 @@ namespace CatanService.State
         public ConcurrentDictionary<string, Player> NameToPlayerDictionary { get; } = new ConcurrentDictionary<string, Player>();
         public GameInfo GameInfo { get; set; }
         public bool Started { get; set; } = false;
+
+       
+
+        public int GetNextSequenceNumber()
+        {
+            return Interlocked.Increment(ref GlobalSequnceNumber);
+        }
 
         public bool PostLog(CatanMessage message)
         {
@@ -165,99 +174,18 @@ namespace CatanService.State
         }
     }
 
-    public class WebSocketData
-    {
-        private ConcurrentQueue<byte[]> MessageQueue { get; } = new ConcurrentQueue<byte[]>();
-        public HttpContext HttpContext { get; set; }
-        public WebSocket WebSocket { get; set; }
-        public TaskCompletionSource<object> Tcs { get; private set; } = new TaskCompletionSource<object>();
-
-        public WebSocketData(ConcurrentQueue<(string, byte[])> messages)
-        {
-            foreach(var (_, message) in messages)
-            {
-
-                MessageQueue.Enqueue(message);
-            }
-        }
-
-        public void PostMessage(byte[] msg)
-        {
-                      
-            MessageQueue.Enqueue(msg); // note this is not a copy, but it is readonly
-            if (Tcs != null && Tcs.Task.IsCompleted == false)
-            {
-                Tcs.SetResult(null);
-            }
-        }
-        public async Task PostClientMessages()
-        {
-
-            while (true)
-            {
-                Contract.Assert(Tcs != null);
-                Contract.Assert(Tcs.Task.IsCompleted == false);
-
-                if (MessageQueue.Count == 0)
-                {
-                    await Tcs.Task;
-                    if (Tcs.Task.IsCanceled) break;
-                }
-                while (MessageQueue.TryDequeue(out byte[] byteMessage))
-                {
-                    Contract.Assert(byteMessage != null);
-                    Contract.Assert(WebSocket != null);
-                    await WebSocket.SendAsync(byteMessage, WebSocketMessageType.Text, true, CancellationToken.None);
-                }
-
-                Tcs = new TaskCompletionSource<object>();
-
-                //  there is a race condition where messages are posted faster than we can send them to the client
-                //  and then they stop posting -- so we end up with message in the MessageQueu but we don't have
-                //  anything to release them.  this is very unlikely t happen in our scenario as games don't get
-                //  created all that often.
-
-
-
-                //
-                //  wait for the client to ack -- this needs a timeout in case the client dies
-                //  We expect the client to get the message and immediately ack back -- if you are dedugging on the client, 
-                //  don't break between recieving the message and sending the ack...
-                //
-                var buffer = new byte[1024 * 4];
-                Task<WebSocketReceiveResult> task = WebSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-                try
-                {
-                    var result = await task.TimeoutAfter<WebSocketReceiveResult>(TimeSpan.FromSeconds(60));
-                    string json = Encoding.UTF8.GetString(buffer, 0, result.Count);
-                    WsMessage message = CatanProxy.Deserialize<WsMessage>(json); // need the CatanProxies JsonOptions
-                    if (message == null) break;
-                    if (message.MessageType != CatanWsMessageType.Ack) break;
-                    if (result.CloseStatus != null && result.CloseStatus.HasValue == false) break;
-                }
-                catch(TimeoutException)
-                {
-                    break;
-                }
-
-            }
-            //
-            //  return will close the socket
-        }
-
-      
-
-    }
+   
 
     public class Games
     {
-        private ConcurrentDictionary<string, Game> GameDictionary { get; } = new ConcurrentDictionary<string, Game>();
+        private ConcurrentDictionary<Guid, Game> GameDictionary { get; } = new ConcurrentDictionary<Guid, Game>();
         private List<WebSocketData> WsCallbacks { get; } = new List<WebSocketData>();
-        private ConcurrentQueue<(string, byte[])> HistoricalMessages { get; set; } = new ConcurrentQueue<(string, byte[])>();
+        private ConcurrentQueue<(Guid, byte[])> HistoricalMessages { get; set; } = new ConcurrentQueue<(Guid, byte[])>();
         private int ClientMessageSequence = 0;
-        public Game GetGame(string gameKey)
+        public Game GetGame(Guid id)
         {
-            GameDictionary.TryGetValue(gameKey, out Game game);
+            bool exists = GameDictionary.TryGetValue(id, out Game game);
+            if (!exists) return null;
             return game;
         }
 
@@ -271,16 +199,16 @@ namespace CatanService.State
             return games;
         }
 
-        public bool DeleteGame(string gameId, out Game game)
+        public bool DeleteGame(Guid id, out Game game)
         {
-            bool success = GameDictionary.TryRemove(gameId, out game); ;
+            bool success = GameDictionary.TryRemove(id, out game); ;
             if (success)
             {
                 // need to remove the deleted item from the historical queue
-                var queu = new ConcurrentQueue<(string, byte[])>();
-                while (HistoricalMessages.TryDequeue(out (string id, byte[] message) msg))
+                var queu = new ConcurrentQueue<(Guid, byte[])>();
+                while (HistoricalMessages.TryDequeue(out (Guid id, byte[] message) msg))
                 {
-                    if (msg.id != gameId)
+                    if (msg.id != id)
                     {
                         queu.Enqueue(msg);
                     }
@@ -288,33 +216,33 @@ namespace CatanService.State
                 HistoricalMessages = queu;
 
                 var message = new WsMessage() { Data = new WsGameMessage() { GameInfo = game.GameInfo }, DataType = typeof(WsGameMessage).FullName, MessageType = CatanWsMessageType.GameDeleted };
-                PostToAllClients(gameId, message);
+                PostToAllClients(id, message);
                 
             }
             return success;
         }
 
-        public Player GetPlayer(string gameKey, string playerName)
+        public Player GetPlayer(Guid key, string playerName)
         {
-            var game = GetGame(gameKey);
+            var game = GetGame(key);
             if (game == default) return null;
             game.NameToPlayerDictionary.TryGetValue(playerName, out Player player);
             return player;
 
         }
 
-        public bool AddGame(string gameName, Game game)
+        public bool AddGame(Guid id, Game game)
         {
-            if (GameDictionary.ContainsKey(gameName))
+            if (GameDictionary.ContainsKey(id))
                 return false;
 
-            GameDictionary.TryAdd(gameName, game);
+            GameDictionary.TryAdd(id, game);
             
-            PostToAllClients(game.GameInfo.Id, new WsMessage() { Data = new WsGameMessage() { GameInfo = game.GameInfo }, DataType = typeof(WsGameMessage).FullName, MessageType = CatanWsMessageType.GameAdded });
+            PostToAllClients(id, new WsMessage() { Data = new WsGameMessage() { GameInfo = game.GameInfo }, DataType = typeof(WsGameMessage).FullName, MessageType = CatanWsMessageType.GameAdded });
             return true;
         }
 
-        private void PostToAllClients(string id, WsMessage message)
+        private void PostToAllClients(Guid id, WsMessage message)
         {
             message.Sequence = Interlocked.Increment(ref ClientMessageSequence);
             var msg = JsonSerializer.SerializeToUtf8Bytes(message, typeof(WsMessage), CatanProxy.GetJsonOptions());
@@ -333,7 +261,7 @@ namespace CatanService.State
             var wsData = new WebSocketData(HistoricalMessages) { HttpContext = context, WebSocket = webSocket };
             
             WsCallbacks.Add(wsData);
-            await  wsData.PostClientMessages();
+            await  wsData.ProcessMessages();
             WsCallbacks.Remove(wsData);
 
 
