@@ -38,7 +38,7 @@ namespace CatanService
                 Tcs.SetResult(null);
             }
         }
-        public async Task ProcessMessages()
+        public async Task PostClientMessages()
         {
 
             while (true)
@@ -109,7 +109,7 @@ namespace CatanService
             var wsData = new WebSocketData(HistoricalMessages) { HttpContext = context, WebSocket = webSocket };
 
             WsCallbacks.Add(wsData);
-            await wsData.ProcessMessages();
+            await wsData.PostClientMessages();
             WsCallbacks.Remove(wsData);
 
 
