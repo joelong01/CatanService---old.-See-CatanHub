@@ -51,7 +51,12 @@ namespace CatanService.Controllers
         #endregion Properties
 
         #region Methods
-
+        [HttpGet("keepalive")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public IActionResult KeepAlive()
+        {
+            return Ok();
+        }
         [HttpPost("message/{gameId}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -224,7 +229,7 @@ namespace CatanService.Controllers
             var res = new CatanResult(CatanError.NoError)
             {
                 CantanRequest = new CatanRequest() { Url = this.Request.Path },
-                Description = $"ServiceVersion=2.1",
+                Description = $"ServiceVersion=2.2",
             };
             return Ok(res);
         }

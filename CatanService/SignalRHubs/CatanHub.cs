@@ -1,37 +1,51 @@
-﻿using System.Collections.Concurrent;
+﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+
+using Catan.Proxy;
+
+using CatanService.Controllers;
+using CatanService.State;
 
 using Microsoft.AspNetCore.SignalR;
 
 namespace CatanService
 
 {
-
+    /// <summary>
+    ///     these are the signatures of the "OnRecieved" calls on the client
+    /// </summary>
     public interface ICatanClient
     {
-        Task BroadcastMessage(string playerName, string message);
-        Task DeleteGame(string gameName);
-        Task CreateGame(string gameName, string playerName, string gameInfo);
-        Task JoinGame(string gameName, string playerName);
-        Task SendPrivateMessage(string message);
+        #region Methods
+
+        Task AllGames(List<GameInfo> games);
+
+        Task CreateGame(GameInfo gameInfo, string by);
+
+        Task DeleteGame(Guid id, string by);
+
+        Task JoinGame(GameInfo gameInfo, string playerName);
+
+        Task LeaveGame(GameInfo gameInfo, string playerName);
+
+        Task ToAllClients(string message);
+
+        Task ToOneClient(string message);
+
+        #endregion Methods
     }
 
     public static class SignalRConnectionToGroupsMap
     {
-        #region Properties + Fields 
+        #region Properties + Fields
 
         private static readonly ConcurrentDictionary<string, List<string>> Map = new ConcurrentDictionary<string, List<string>>();
 
-        #endregion Properties + Fields 
+        #endregion Properties + Fields
 
-        #region Constructors
 
-        #endregion Constructors
-
-        #region Delegates  + Events + Enums
-
-        #endregion Delegates  + Events + Enums
 
         #region Methods
 
@@ -71,60 +85,176 @@ namespace CatanService
         }
 
         #endregion Methods
-
-      
     }
 
     public class CatanHub : Hub<ICatanClient>
     {
-       
+        #region Properties
+
+        private static string AllUsers { get; } = "{158B5187-959E-4A81-A8F9-CD9BE0D30300}";
+
+        #endregion Properties
+
         #region Methods
 
-        public Task BroadcastMessage(string gameName, string playerName, string message)
+        public Task BroadcastMessage(string gameId, string message)
         {
-            return Clients.Group(gameName).BroadcastMessage(playerName, message);
+            return Clients.Group(gameId).ToAllClients(message);
         }
 
-        public async Task CreateGame(string gameName, string playerName, string jsonGameInfo)
+        /// <summary>
+        ///     Create the datastructures needed to communicate across machines
+        ///     Typically the first API to call in the service
+        ///
+        /// </summary>
+        /// <param name="gameId">a stringified Guid</param>
+        /// <param name="clientPlayerId">the name of the player - must be unique inside of game</param>
+        /// <param name="jsonGameInfo">he JSON string representing a GameInfo objec</param>
+        /// <returns></returns>
+        public async Task CreateGame(GameInfo gameInfo)
         {
-            if (SignalRConnectionToGroupsMap.TryAddGroup(Context.ConnectionId, gameName))
+            Game game = GameController.Games.GetGame(gameInfo.Id);
+            if (game == default)
             {
-                await Groups.AddToGroupAsync(Context.ConnectionId, gameName);
-                await Clients.Group(gameName).CreateGame(gameName, playerName, jsonGameInfo);
+                GameController.Games.AddGame(gameInfo.Id, new Game() { GameInfo = gameInfo });
+                await Groups.AddToGroupAsync(Context.ConnectionId, gameInfo.Id.ToString());
+                //
+                //  tell *all* the clients that a game was created
+                await Clients.All.CreateGame(gameInfo, gameInfo.Creator);
+                return;
+            }
+            //
+            //  send the client an error?
+        }
+
+        public async Task DeleteGame(Guid id, string by)
+        {
+            try
+            {
+                bool success = GameController.Games.DeleteGame(id, out Game game);
+                if (!success)
+                {
+                    //
+                    // send error
+                    return;
+                }
+                //
+                //  tell *all* the clients that a game was deleted
+                await Clients.All.DeleteGame(id, by);
+            }
+            catch (Exception e)
+            {
+                // send error
+                Console.Out.WriteLine(e.ToString());
             }
         }
-       
-        public async Task DeleteGame(string gameName)
-        {
-            
-            foreach (var id in SignalRConnectionToGroupsMap.Connections(gameName))
-            {
-                await Clients.Group(gameName).DeleteGame(gameName);
-                await Groups.RemoveFromGroupAsync(id, gameName);
 
+        public async Task GetAllGames()
+        {
+            var games = GameController.Games.GetGames();
+            await Clients.Caller.AllGames(games);
+        }
+
+        public async Task JoinGame(GameInfo gameInfo, string playerName)
+        {
+            try
+            {
+                Game game = GameController.Games.GetGame(gameInfo.Id);
+
+                if (game == null)
+                {
+                    //
+                    //   send error?
+                    return;
+                }
+
+                bool success = game.NameToPlayerDictionary.TryAdd(playerName, new Player(game.GameLog));
+                string gameId = gameInfo.Id.ToString();
+                //
+                //  add the client to the game SignalR Group
+                await Groups.AddToGroupAsync(Context.ConnectionId, gameId);
+                //
+                //  notify everybody else in the group that somebody has joined the game
+                await Clients.Group(gameId).JoinGame(gameInfo, playerName);
+
+                if (!success)
+                {
+                    //
+                    //    error?
+                    return;
+                }
+            }
+            catch (Exception e)
+            {
+                //
+                //  client error
+                Console.Out.WriteLine(e.ToString());
             }
         }
 
-        public async Task JoinGame(string gameName, string playerName)
+        public async Task LeaveGame(GameInfo gameInfo, string playerName)
         {
-            if (SignalRConnectionToGroupsMap.TryAddGroup(Context.ConnectionId, gameName))
+            try
             {
-                await Groups.AddToGroupAsync(Context.ConnectionId, gameName);
-                await Clients.Group(gameName).JoinGame(gameName, playerName);
+                Game game = GameController.Games.GetGame(gameInfo.Id);
+
+                if (game == null)
+                {
+                    // send error
+                    return;
+                }
+
+                if (game.Started)
+                {
+                    // different error
+                    // Description = $"Player '{playerName}' can't be removed from '{gameInfo.Name}' because it has already been started.",
+
+                    return;
+                }
+
+                if (game.GameInfo.Creator == playerName)
+                {
+                    //
+                    //    Description = $"The Creator can't leave their own game.",
+
+                    return;
+                }
+
+                //
+                //  should already be in here since you shoudl have called Monitor()
+                bool success = game.NameToPlayerDictionary.TryRemove(playerName, out Player player);
+
+                if (!success)
+                {
+                    // Description = $"Player '{playerName}' can't be removed from '{gameInfo.Name}'.",
+                    return;
+                }
+
+                await Clients.Group(gameInfo.Id.ToString()).LeaveGame(gameInfo, playerName);
             }
-
-            
+            catch (Exception e)
+            {
+                // Description = $"{this.Request.Path} threw an exception. {e}",
+                Console.Out.WriteLine(e.ToString());
+            }
         }
 
-        public Task SendPrivateMessage(string playerName, string message)
+        public override async Task OnConnectedAsync()
         {
-            return Clients.User(playerName).SendPrivateMessage(message);
+            await Groups.AddToGroupAsync(Context.ConnectionId, AllUsers);
+            await base.OnConnectedAsync();            
         }
 
-       
+        public override async Task OnDisconnectedAsync(Exception exception)
+        {
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, AllUsers);
+            await base.OnDisconnectedAsync(exception);
+        }
+        public Task SendPrivateMessage(string gameId, string message)
+        {
+            return Clients.User(gameId).ToOneClient(message);
+        }
 
         #endregion Methods
-
-       
     }
 }

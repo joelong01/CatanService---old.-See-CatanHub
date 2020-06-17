@@ -25,7 +25,7 @@ namespace CatanService
 
     public class Startup
     {
-        static bool addSignalR = false;
+        static bool addSignalR = true;
 
         public Startup(IConfiguration configuration)
         {
@@ -102,7 +102,7 @@ namespace CatanService
             {
                 endpoints.MapControllers();
                 if (addSignalR)
-                    endpoints.MapHub<CatanHub>("/catan");
+                    endpoints.MapHub<CatanHub>("/CatanHub");
             });
 
 
