@@ -19,8 +19,9 @@ namespace CatanService
     public interface ICatanClient
     {
         #region Methods
-
+        Task OnAck(string fromPlayer, Guid messageId);
         Task AllGames(List<GameInfo> games);
+        Task AllPlayers(ICollection<string> players);
 
         Task CreateGame(GameInfo gameInfo, string by);
 
@@ -30,59 +31,9 @@ namespace CatanService
 
         Task LeaveGame(GameInfo gameInfo, string playerName);
 
-        Task ToAllClients(string message);
+        Task ToAllClients(CatanMessage message);
 
-        Task ToOneClient(string message);
-
-        #endregion Methods
-    }
-
-    public static class SignalRConnectionToGroupsMap
-    {
-        #region Properties + Fields
-
-        private static readonly ConcurrentDictionary<string, List<string>> Map = new ConcurrentDictionary<string, List<string>>();
-
-        #endregion Properties + Fields
-
-
-
-        #region Methods
-
-        public static List<string> Connections(string gameName)
-        {
-            if (Map.TryGetValue(gameName, out List<string> list))
-            {
-                return list;
-            }
-
-            return new List<string>();
-        }
-
-        public static bool TryAddGroup(string connectionId, string gameName)
-        {
-            List<string> groups;
-
-            if (!Map.TryGetValue(connectionId, out groups))
-            {
-                return Map.TryAdd(connectionId, new List<string>() { gameName });
-            }
-
-            if (!groups.Contains(gameName))
-            {
-                groups.Add(gameName);
-            }
-
-            return true;
-        }
-
-        // since for this use case we will only want to get the List of group names
-        // when we're removing the mapping - we might as well remove the mapping while
-        // we're grabbing the List
-        public static bool TryRemoveConnection(string connectionId, out List<string> result)
-        {
-            return Map.TryRemove(connectionId, out result);
-        }
+        Task ToOneClient(CatanMessage message);
 
         #endregion Methods
     }
@@ -91,15 +42,58 @@ namespace CatanService
     {
         #region Properties
 
+        private static ConcurrentDictionary<string, string> PlayerToConnectionDictionary = new ConcurrentDictionary<string, string>();
+        private static ConcurrentDictionary<string, string> ConnectionToPlayerDictionary = new ConcurrentDictionary<string, string>();
+
         private static string AllUsers { get; } = "{158B5187-959E-4A81-A8F9-CD9BE0D30300}";
 
         #endregion Properties
 
         #region Methods
 
-        public Task BroadcastMessage(string gameId, string message)
+        public Task Ack(Guid gameId, string fromPlayer, string toPlayer, Guid messageId)
         {
-            return Clients.Group(gameId).ToAllClients(message);
+            Game game = GameController.Games.GetGame(gameId);
+            if (game != null)
+            {
+                return Clients.Group(gameId.ToString()).OnAck(fromPlayer, messageId);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public Task BroadcastMessage(Guid gameId, CatanMessage message)
+        {
+            //
+            //  need to unmarshal to store the message and set the sequence number
+            //  
+
+            Game game = GameController.Games.GetGame(gameId);
+            if (game != null)
+            {
+                message.MessageType = MessageType.BroadcastMessage;
+                // record in game log, but not player log and set the sequence number
+                // note: this means there is no interop between a REST client and a SignalR client.
+                game.PostLog(message, false);
+
+
+                return Clients.Group(gameId.ToString()).ToAllClients(message);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public Task Reset()
+        {
+            GameController.Games = new Games();
+            return Task.CompletedTask;
+        }
+
+        public Task Register(string playerName)
+        {
+            PlayerToConnectionDictionary.AddOrUpdate(playerName, Context.ConnectionId, (key, oldValue) => Context.ConnectionId);
+            ConnectionToPlayerDictionary.AddOrUpdate(Context.ConnectionId, playerName, (key, oldValue) => playerName);
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -142,10 +136,9 @@ namespace CatanService
                 //  tell *all* the clients that a game was deleted
                 await Clients.All.DeleteGame(id, by);
             }
-            catch (Exception e)
+            catch
             {
-                // send error
-                Console.Out.WriteLine(e.ToString());
+                // swallow
             }
         }
 
@@ -153,6 +146,19 @@ namespace CatanService
         {
             var games = GameController.Games.GetGames();
             await Clients.Caller.AllGames(games);
+        }
+
+        public async Task GetPlayersInGame(Guid gameId)
+        {
+            Game game = GameController.Games.GetGame(gameId);
+            if (game != null)
+            {
+                await Clients.Caller.AllPlayers(game.NameToPlayerDictionary.Keys);
+            }
+            else
+            {
+                await Clients.Caller.AllPlayers(new List<string>());
+            }
         }
 
         public async Task JoinGame(GameInfo gameInfo, string playerName)
@@ -173,6 +179,7 @@ namespace CatanService
                 //
                 //  add the client to the game SignalR Group
                 await Groups.AddToGroupAsync(Context.ConnectionId, gameId);
+
                 //
                 //  notify everybody else in the group that somebody has joined the game
                 await Clients.Group(gameId).JoinGame(gameInfo, playerName);
@@ -230,6 +237,8 @@ namespace CatanService
                     return;
                 }
 
+                _ = Groups.RemoveFromGroupAsync(Context.ConnectionId, gameInfo.Id.ToString());
+
                 await Clients.Group(gameInfo.Id.ToString()).LeaveGame(gameInfo, playerName);
             }
             catch (Exception e)
@@ -242,17 +251,27 @@ namespace CatanService
         public override async Task OnConnectedAsync()
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, AllUsers);
-            await base.OnConnectedAsync();            
+            await base.OnConnectedAsync();
         }
 
         public override async Task OnDisconnectedAsync(Exception exception)
         {
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, AllUsers);
+            if (ConnectionToPlayerDictionary.TryGetValue(Context.ConnectionId, out string playerName))
+            {
+                PlayerToConnectionDictionary.TryRemove(playerName, out string _);
+                ConnectionToPlayerDictionary.TryRemove(Context.ConnectionId, out string _);
+            }
             await base.OnDisconnectedAsync(exception);
         }
-        public Task SendPrivateMessage(string gameId, string message)
+        public Task SendPrivateMessage(string toName, CatanMessage message)
         {
-            return Clients.User(gameId).ToOneClient(message);
+            message.ActionType = ActionType.Redo;
+            var toId = PlayerToConnectionDictionary[toName];
+            Console.WriteLine($"[ToId: {toId}] for [toName={toName}]");
+            //return Clients.User(toId).ToOneClient(message);
+             return Clients.All.ToOneClient(message);
+            
         }
 
         #endregion Methods

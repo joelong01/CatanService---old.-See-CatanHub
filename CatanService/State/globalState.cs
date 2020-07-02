@@ -154,13 +154,16 @@ namespace CatanService.State
             return Interlocked.Increment(ref GlobalSequnceNumber);
         }
 
-        public bool PostLog(CatanMessage message)
+        public bool PostLog(CatanMessage message, bool addToPlayerLog = true)
         {
             message.Sequence = Interlocked.Increment(ref GlobalSequnceNumber);
             GameLog.Enqueue(message);
-            foreach (var player in NameToPlayerDictionary.Values)
+            if (addToPlayerLog)
             {
-                player.PlayerLog.Enqueue(message);
+                foreach (var player in NameToPlayerDictionary.Values)
+                {
+                    player.PlayerLog.Enqueue(message);
+                }
             }
             return true;
         }

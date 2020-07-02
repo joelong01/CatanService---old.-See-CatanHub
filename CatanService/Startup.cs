@@ -26,6 +26,7 @@ namespace CatanService
     public class Startup
     {
         static bool addSignalR = true;
+        static bool useAzure = false;
 
         public Startup(IConfiguration configuration)
         {
@@ -51,8 +52,18 @@ namespace CatanService
                 options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
 
             });
+
             if (addSignalR)
-            services.AddSignalR().AddAzureSignalR();
+            {
+                if (useAzure)
+                {
+                    services.AddSignalR().AddAzureSignalR();
+                }
+                else
+                {
+                    services.AddSignalR();
+                }
+            }
 
         }
 

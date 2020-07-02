@@ -46,7 +46,7 @@ namespace CatanService.Controllers
     {
         #region Properties
 
-        public static Games Games { get; } = new Games();
+        public static Games Games { get; set; } = new Games();
 
         #endregion Properties
 
@@ -229,7 +229,7 @@ namespace CatanService.Controllers
             var res = new CatanResult(CatanError.NoError)
             {
                 CantanRequest = new CatanRequest() { Url = this.Request.Path },
-                Description = $"ServiceVersion=2.2",
+                Description = $"ServiceVersion=2.5",
             };
             return Ok(res);
         }
